@@ -43,6 +43,8 @@
 
 > First translation triggers contextual batching (aggregates text within a 100ms window). Results appear shortly.
 
+> **Switching target language**: Modify the target language in "Config -> Translation Prompt". For example, change "翻译为中文" to "translate to Japanese", "translated to Spanish", etc.
+
 ## Build
 
 ```
@@ -85,7 +87,3 @@ Kotlin Hook (android/)     Runs inside target app processes
 ## License
 
 MIT
-
----
-
-**GitHub**: [github.com/sakukir](https://github.com/sakukir)

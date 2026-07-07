@@ -43,6 +43,8 @@
 
 > 首次翻译会触发上下文批处理（收集 100ms 内的多条文本），稍等即见翻译结果。
 
+> **切换目标语言**：修改"翻译配置 -> 翻译 Prompt"中的目标语言即可。例如将 Prompt 中的"翻译为中文"改为"翻译为日语"、"translate to Spanish" 等。
+
 ## 构建
 
 ```
@@ -85,7 +87,3 @@ Kotlin Hook (android/)     运行在被翻译 App 的进程中
 ## 许可
 
 MIT
-
----
-
-**GitHub**: [github.com/sakukir](https://github.com/sakukir)
