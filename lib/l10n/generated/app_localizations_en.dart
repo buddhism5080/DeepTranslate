@@ -1,0 +1,315 @@
+// ignore: unused_import
+import 'package:intl/intl.dart' as intl;
+import 'app_localizations.dart';
+
+// ignore_for_file: type=lint
+
+/// The translations for English (`en`).
+class AppLocalizationsEn extends AppLocalizations {
+  AppLocalizationsEn([String locale = 'en']) : super(locale);
+
+  @override
+  String get appTitle => 'DeepTranslate';
+
+  @override
+  String get navHome => 'Home';
+
+  @override
+  String get navTranslateConfig => 'Config';
+
+  @override
+  String get navSettings => 'Settings';
+
+  @override
+  String get moduleStatus => 'Module Status';
+
+  @override
+  String get activated => 'Activated';
+
+  @override
+  String get notActivated => 'Not Activated';
+
+  @override
+  String get enableInLSPosed => 'Enable in LSPosed and select target apps';
+
+  @override
+  String get translationStatus => 'Translation';
+
+  @override
+  String get globalTranslation => 'Global Translation';
+
+  @override
+  String get globalTranslationDesc =>
+      'Hook and translate text in all selected apps';
+
+  @override
+  String get accountBalance => 'Account Balance';
+
+  @override
+  String get noApiKey => 'API Key not configured';
+
+  @override
+  String get fetchFailed => 'Fetch failed';
+
+  @override
+  String get totalTokens => 'Total Tokens Used';
+
+  @override
+  String get resetStats => 'Reset Stats';
+
+  @override
+  String get resetTokenTitle => 'Reset Token Stats';
+
+  @override
+  String get resetTokenContent =>
+      'Are you sure you want to reset the token count? This cannot be undone.';
+
+  @override
+  String get cancel => 'Cancel';
+
+  @override
+  String get confirm => 'Confirm';
+
+  @override
+  String get usageNotes => 'Notes';
+
+  @override
+  String get note1 => '1. Enter your DeepSeek API Key in Config';
+
+  @override
+  String get note2 => '2. Enable the module in LSPosed, select target apps';
+
+  @override
+  String get note3 => '3. Restart target apps, text will auto-translate';
+
+  @override
+  String get note4 => '4. Translations are cached to avoid repeated API calls';
+
+  @override
+  String get note5 =>
+      '5. Batch mode aggregates context to avoid word-by-word errors';
+
+  @override
+  String get refresh => 'Refresh';
+
+  @override
+  String get apiConfig => 'API Config';
+
+  @override
+  String get apiUrl => 'API URL';
+
+  @override
+  String get apiKey => 'API Key';
+
+  @override
+  String get model => 'Model';
+
+  @override
+  String get testConn => 'Test Connection';
+
+  @override
+  String get testing => 'Testing...';
+
+  @override
+  String get fetchModels => 'Fetch Models';
+
+  @override
+  String get translatePrompt => 'Translation Prompt';
+
+  @override
+  String get timeout => 'Timeout';
+
+  @override
+  String get temperature => 'Temperature';
+
+  @override
+  String get maxTokens => 'Max Tokens';
+
+  @override
+  String get save => 'Save';
+
+  @override
+  String get configSaved => 'Configuration saved';
+
+  @override
+  String get appearance => 'Appearance';
+
+  @override
+  String get themeColor => 'Theme Color';
+
+  @override
+  String get blurGlass => 'Frosted Glass';
+
+  @override
+  String get blurGlassDesc => 'Blur background on top and bottom bars';
+
+  @override
+  String get translationBehavior => 'Translation Behavior';
+
+  @override
+  String get toastNotification => 'Translation Toast';
+
+  @override
+  String get toastNotificationDesc => 'Show a toast when text is translated';
+
+  @override
+  String get debugLog => 'Debug Log';
+
+  @override
+  String get debugLogDesc => 'Output detailed hook logs to logcat';
+
+  @override
+  String get cacheManagement => 'Cache Management';
+
+  @override
+  String cachedCount(Object count) {
+    return '$count entries · tap for details';
+  }
+
+  @override
+  String get clearAllCache => 'Clear All Cache';
+
+  @override
+  String get clearAllCacheTitle => 'Clear All Cache';
+
+  @override
+  String get clearAllCacheContent =>
+      'Are you sure you want to clear all translation caches? This cannot be undone.';
+
+  @override
+  String get clearAllCacheConfirm => 'Clear All';
+
+  @override
+  String get cacheCleared => 'Cache cleared';
+
+  @override
+  String get clearAllCacheDone => 'All caches cleared';
+
+  @override
+  String get about => 'About';
+
+  @override
+  String get engine => 'Translation Engine';
+
+  @override
+  String get version => 'Version';
+
+  @override
+  String get detectingStatus => 'Detecting module status...';
+
+  @override
+  String get language => 'Language';
+
+  @override
+  String get languageTitle => 'Interface Language';
+
+  @override
+  String get settings => 'Settings';
+
+  @override
+  String get themeSystem => 'Follow System';
+
+  @override
+  String get themeLight => 'Light';
+
+  @override
+  String get themeDark => 'Dark';
+
+  @override
+  String get cachedTranslations => 'Cached Translations';
+
+  @override
+  String get clearCacheFailed => 'Clear failed';
+
+  @override
+  String get appSubtitle => 'LSPosed Global Real-time Translation Module';
+
+  @override
+  String get engineDesc => 'DeepSeek API (OpenAI Compatible)';
+
+  @override
+  String get apiUrlHint => 'https://api.deepseek.com/v1/chat/completions';
+
+  @override
+  String get apiKeyHint => 'sk-xxxxxxxxxxxxxxxx';
+
+  @override
+  String timeoutSeconds(Object seconds) {
+    return '${seconds}s';
+  }
+
+  @override
+  String get temperatureDesc =>
+      'Lower = more deterministic, higher = more creative';
+
+  @override
+  String get maxTokensDesc => 'Maximum response length';
+
+  @override
+  String get batchConfig => 'Batch Config';
+
+  @override
+  String get batchSize => 'Batch Size';
+
+  @override
+  String get batchSizeDesc => 'Max texts per API request';
+
+  @override
+  String get batchWindow => 'Batch Window';
+
+  @override
+  String get batchWindowDesc => 'Time to wait for more text (ms)';
+
+  @override
+  String get translationCache => 'Translation Cache';
+
+  @override
+  String get translationCacheDesc =>
+      'Cache translations locally to avoid repeated API calls';
+
+  @override
+  String get deepseekInfo =>
+      'DeepSeek API is compatible with the OpenAI protocol. Uses the deepseek-chat model by default, supports prompt caching to reduce repeated request costs. Batch mode aggregates multiple texts from the same page with context to avoid word-by-word translation artifacts.';
+
+  @override
+  String get promptHint => 'Tap to edit translation prompt...';
+
+  @override
+  String get restoreDefault => 'Restore Default';
+
+  @override
+  String get promptEditHint => 'Enter translation prompt...';
+
+  @override
+  String get apiUrlEmpty => 'API URL cannot be empty';
+
+  @override
+  String get cacheDetail => 'Cache Details';
+
+  @override
+  String get clearAll => 'Clear All';
+
+  @override
+  String get noCacheData => 'No cached data';
+
+  @override
+  String get clearAppCache => 'Clear App Cache';
+
+  @override
+  String clearAppCacheContent(Object package) {
+    return 'Clear cache stats for $package?';
+  }
+
+  @override
+  String appCacheCleared(Object package) {
+    return 'Cache cleared for $package';
+  }
+
+  @override
+  String get clearAllCacheStatsContent => 'Clear all apps\' cache stats?';
+
+  @override
+  String cacheEntry(Object count, Object package) {
+    return '$count entries · $package';
+  }
+}

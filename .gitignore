@@ -1,0 +1,33 @@
+# Build
+build/
+android/app/build/
+android/build/
+android/.gradle/
+
+# Dart
+.dart_tool/
+.packages
+.pub/
+
+# Flutter
+.flutter-plugins
+.flutter-plugins-dependencies
+
+# Android
+android/local.properties
+android/.kotlin/
+GeneratedPluginRegistrant.java
+*.jks
+*.keystore
+keystore.properties
+
+# IDE
+.idea/
+*.iml
+*.swp
+*.swo
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
