@@ -1,4 +1,3 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -19,9 +18,6 @@ class _HomePageState extends State<HomePage> {
   final _ctrl = SettingsController.instance;
   String _version = '';
   bool? _moduleActive;
-  String _balance = '';
-  int _totalTokens = 0;
-  bool _loadingBalance = false;
 
   @override
   void initState() {
@@ -50,37 +46,6 @@ class _HomePageState extends State<HomePage> {
       if (mounted) setState(() => _moduleActive = status['active'] as bool? ?? false);
     } catch (_) {
       if (mounted) setState(() => _moduleActive = false);
-    }
-    _refreshBalance();
-    _refreshTokens();
-  }
-
-  void _refreshTokens() async {
-    try {
-      final tokens = await AppInfoService.getTotalTokens();
-      if (mounted) setState(() => _totalTokens = tokens);
-    } catch (_) {}
-  }
-
-  void _refreshBalance() async {
-    final apiKey = _ctrl.aiApiKey;
-    if (apiKey.isEmpty) {
-      setState(() { _balance = ''; });
-      return;
-    }
-    setState(() => _loadingBalance = true);
-    try {
-      final result = await AppInfoService.getBalance(apiKey);
-      if (mounted) {
-        setState(() {
-          _balance = result['balance'] as String? ?? '';
-          _loadingBalance = false;
-        });
-      }
-    } catch (_) {
-      if (mounted) {
-        setState(() { _balance = ''; _loadingBalance = false; });
-      }
     }
   }
 
@@ -150,13 +115,6 @@ class _HomePageState extends State<HomePage> {
             onPressed: () => launchUrl(Uri.parse('https://github.com/sakukir'), mode: LaunchMode.externalApplication),
             tooltip: 'GitHub',
           ),
-          IconButton(
-            icon: _loadingBalance
-                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                : const Icon(Icons.refresh),
-            onPressed: _loadingBalance ? null : () { _refreshBalance(); _refreshTokens(); },
-            tooltip: l10n.refresh,
-          ),
         ],
         bottomPadding: bottomPad,
         slivers: [
@@ -182,77 +140,6 @@ class _HomePageState extends State<HomePage> {
                 ),
                 const SizedBox(height: 24),
 
-                SectionLabel('DeepSeek'),
-                const SizedBox(height: 8),
-                Card(
-                  elevation: 0, color: cs.surfaceContainerHighest,
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      children: [
-                        Row(children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
-                            child: Image.asset('assets/images/deepseek.png', width: 40, height: 40),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                              Text(l10n.accountBalance, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
-                              if (_balance.isNotEmpty)
-                                Text('¥ $_balance', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold, color: cs.primary))
-                              else if (_ctrl.aiApiKey.isEmpty)
-                                Text(l10n.noApiKey, style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant))
-                              else if (_loadingBalance)
-                                const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                              else
-                                Text(l10n.fetchFailed, style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: cs.error)),
-                            ]),
-                          ),
-                        ]),
-                        const Divider(height: 24),
-                        Row(children: [
-                          const SizedBox(width: 40, height: 40, child: Icon(Icons.token, color: Color(0xFF7C4DFF), size: 28)),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                              Text(l10n.totalTokens, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
-                              Text(_totalTokens > 0 ? _fmt(_totalTokens) : '0',
-                                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold, color: const Color(0xFF7C4DFF))),
-                            ]),
-                          ),
-                          if (_totalTokens > 0)
-                            SizedBox(
-                              width: 40, height: 40,
-                              child: IconButton(
-                                icon: const Icon(Icons.restart_alt, size: 20), padding: EdgeInsets.zero,
-                                onPressed: () async {
-                                  final ok = await showDialog<bool>(
-                                    context: context,
-                                    builder: (ctx) => AlertDialog(
-                                      title: Text(l10n.resetTokenTitle),
-                                      content: Text(l10n.resetTokenContent),
-                                      actions: [
-                                        TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(l10n.cancel)),
-                                        FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(l10n.confirm)),
-                                      ],
-                                    ),
-                                  );
-                                  if (ok == true) {
-                                    await AppInfoService.resetTokens();
-                                    _refreshTokens();
-                                  }
-                                },
-                                tooltip: l10n.resetStats,
-                              ),
-                            ),
-                        ]),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-
                 SectionLabel(l10n.usageNotes),
                 const SizedBox(height: 8),
                 const _NotesCard(),
@@ -264,8 +151,6 @@ class _HomePageState extends State<HomePage> {
       ),
     );
   }
-
-  String _fmt(int n) => n >= 1000000 ? '${(n / 1000000).toStringAsFixed(1)}M' : n >= 1000 ? '${(n / 1000).toStringAsFixed(1)}K' : '$n';
 }
 
 class _ModuleStatusCard extends StatelessWidget {

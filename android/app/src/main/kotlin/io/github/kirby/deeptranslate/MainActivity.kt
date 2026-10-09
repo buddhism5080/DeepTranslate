@@ -12,8 +12,6 @@ import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import org.json.JSONObject
-import java.net.HttpURLConnection
-import java.net.URL
 
 class MainActivity : FlutterActivity() {
     private val CHANNEL = "io.github.kirby.deeptranslate/channel"
@@ -22,16 +20,11 @@ class MainActivity : FlutterActivity() {
 
     private val tokenReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
-            val tokens = intent?.getIntExtra("tokens", 0) ?: 0
             val cached = intent?.getIntExtra("cached", 0) ?: 0
             val pkg = intent?.getStringExtra("package") ?: ""
             val prefs = getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
             val editor = prefs.edit()
 
-            if (tokens > 0) {
-                val currentTokens = prefs.getLong("flutter.pref_total_tokens", 0L)
-                editor.putLong("flutter.pref_total_tokens", currentTokens + tokens)
-            }
             if (cached > 0 && pkg.isNotEmpty()) {
                 val jsonStr = prefs.getString(CACHE_PREFS_KEY, "{}") ?: "{}"
                 try {
@@ -211,57 +204,6 @@ class MainActivity : FlutterActivity() {
                 }
 
                 "getBuildTime" -> { result.success(BuildConfig.BUILD_TIME) }
-
-                "getTotalTokens" -> {
-                    val prefs = getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
-                    result.success(prefs.getLong("flutter.pref_total_tokens", 0L))
-                }
-
-                "resetTokens" -> {
-                    getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
-                        .edit().putLong("flutter.pref_total_tokens", 0L).apply()
-                    result.success(true)
-                }
-
-                "getBalance" -> {
-                    val apiKey = call.argument<String>("apiKey") ?: ""
-                    if (apiKey.isEmpty()) {
-                        result.error("NO_KEY", "API Key not set", null)
-                        return@setMethodCallHandler
-                    }
-                    Thread {
-                        try {
-                            val url = URL("https://api.deepseek.com/user/balance")
-                            val conn = (url.openConnection() as HttpURLConnection).apply {
-                                requestMethod = "GET"; connectTimeout = 10000; readTimeout = 10000
-                                setRequestProperty("Authorization", "Bearer $apiKey")
-                                setRequestProperty("Accept", "application/json")
-                            }
-                            val code = conn.responseCode
-                            val body = if (code in 200..299)
-                                conn.inputStream.bufferedReader().use { it.readText() }
-                            else conn.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
-                            conn.disconnect()
-                            if (code in 200..299) {
-                                val json = JSONObject(body)
-                                val infos = json.optJSONArray("balance_infos")
-                                var balance = ""; var currency = ""
-                                if (infos != null && infos.length() > 0) {
-                                    val info = infos.getJSONObject(0)
-                                    balance = info.optString("total_balance", "")
-                                    currency = info.optString("currency", "CNY")
-                                }
-                                runOnUiThread {
-                                    result.success(mapOf("isAvailable" to json.optBoolean("is_available"), "balance" to balance, "currency" to currency))
-                                }
-                            } else {
-                                runOnUiThread { result.error("API_ERROR", "HTTP $code", null) }
-                            }
-                        } catch (e: Exception) {
-                            runOnUiThread { result.error("NETWORK_ERROR", e.message, null) }
-                        }
-                    }.start()
-                }
 
                 else -> result.notImplemented()
             }

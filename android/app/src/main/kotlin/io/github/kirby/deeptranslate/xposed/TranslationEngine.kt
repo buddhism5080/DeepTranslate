@@ -164,12 +164,7 @@ object TranslationEngine {
             }
             val translations = parseResponse(responseBody, items.map { it.text })
             module?.log(Log.INFO, TAG, "${target.name} parsed ${translations.size}/${items.size}")
-            try {
-                val usage = JSONObject(responseBody).optJSONObject("usage")
-                val totalTokens = usage?.optInt("total_tokens", 0) ?: 0
-                sendStatsUpdate(module, totalTokens, translations.size, packageName)
-            } catch (_: Exception) {
-            }
+            sendStatsUpdate(module, translations.size, packageName)
             return CallResult(translations, responseCode, false)
         } catch (e: Exception) {
             module?.log(Log.ERROR, TAG, "${target.name} failed: ${e.message}")
@@ -349,8 +344,8 @@ $base
         return null
     }
 
-    /** 发送广播通知配置 App 累计 token 消耗和缓存条数。 */
-    private fun sendStatsUpdate(module: XposedModule?, tokens: Int, cached: Int, pkg: String) {
+    /** 通知配置 App 这次新缓存了多少条。 */
+    private fun sendStatsUpdate(module: XposedModule?, cached: Int, pkg: String) {
         try {
             val ctx = module?.let { m ->
                 val cl = m.javaClass.classLoader
@@ -359,13 +354,12 @@ $base
             } ?: return
 
             val intent = android.content.Intent("io.github.kirby.deeptranslate.TOKEN_UPDATE").apply {
-                putExtra("tokens", tokens)
                 putExtra("cached", cached)
                 putExtra("package", pkg)
                 setPackage("io.github.kirby.deeptranslate")
             }
             ctx.sendBroadcast(intent)
-            module.log(Log.INFO, TAG, "stats update sent: tokens=$tokens cached=$cached pkg=$pkg")
+            module.log(Log.INFO, TAG, "stats update sent: cached=$cached pkg=$pkg")
 
             if (ConfigManager.isTranslateToast() && cached > 0) {
                 android.os.Handler(android.os.Looper.getMainLooper()).post {

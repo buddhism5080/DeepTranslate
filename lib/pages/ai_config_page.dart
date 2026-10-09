@@ -146,9 +146,31 @@ class _AiConfigPageState extends State<AiConfigPage> {
     );
   }
 
-  Future<void> _save() async {
+  void _toastSaved() {
+    if (!mounted) return;
     final l10n = AppLocalizations.of(context)!;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(l10n.configSaved),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+    );
+  }
 
+  Widget _saveButton(VoidCallback onPressed) {
+    final l10n = AppLocalizations.of(context)!;
+    return SizedBox(
+      width: double.infinity,
+      child: FilledButton.icon(
+        onPressed: onPressed,
+        icon: const FaIcon(FontAwesomeIcons.floppyDisk, size: 16),
+        label: Text(l10n.save),
+        style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12)),
+      ),
+    );
+  }
+
+  Future<void> _saveApi() async {
     await _ctrl.setAiUrl(_urlCtrl.text.trim());
     await _ctrl.setAiApiKey(_keyCtrl.text.trim());
     await _ctrl.setAiModel(_modelCtrl.text.trim());
@@ -156,26 +178,24 @@ class _AiConfigPageState extends State<AiConfigPage> {
     await _ctrl.setAiTimeout(_aiTimeoutDraft);
     await _ctrl.setAiTemperature(_aiTemperatureDraft);
     await _ctrl.setAiMaxTokens(_aiMaxTokensDraft);
+    _toastSaved();
+  }
+
+  Future<void> _saveFallback() async {
+    await _ctrl.setFallbackUrl(_fbUrlCtrl.text.trim());
+    await _ctrl.setFallbackApiKey(_fbKeyCtrl.text.trim());
+    await _ctrl.setFallbackModel(_fbModelCtrl.text.trim());
+    await _ctrl.setRetryCount(_retryDraft);
+    _toastSaved();
+  }
+
+  Future<void> _saveBatch() async {
     await _ctrl.setBatchSize(_batchSizeDraft);
     await _ctrl.setBatchWindowMs(_batchWindowDraft);
     await _ctrl.setConcurrency(_concurrencyDraft);
     await _ctrl.setMaxParagraphs(_maxParagraphsDraft);
     await _ctrl.setMaxChars(_maxCharsDraft);
-    await _ctrl.setRetryCount(_retryDraft);
-    await _ctrl.setFallbackUrl(_fbUrlCtrl.text.trim());
-    await _ctrl.setFallbackApiKey(_fbKeyCtrl.text.trim());
-    await _ctrl.setFallbackModel(_fbModelCtrl.text.trim());
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(l10n.configSaved),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-        ),
-      );
-    }
+    _toastSaved();
   }
 
   Future<void> _test() async {
@@ -513,15 +533,7 @@ class _AiConfigPageState extends State<AiConfigPage> {
                         ),
 
                         const SizedBox(height: 24),
-                        SizedBox(
-                          width: double.infinity,
-                          child: FilledButton.icon(
-                            onPressed: _save,
-                            icon: const FaIcon(FontAwesomeIcons.floppyDisk, size: 16),
-                            label: Text(l10n.save),
-                            style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12)),
-                          ),
-                        ),
+                        _saveButton(() { _saveApi(); }),
                       ],
                     ),
                   ),
@@ -582,6 +594,8 @@ class _AiConfigPageState extends State<AiConfigPage> {
                           divisions: 3,
                           onChanged: (v) => setState(() => _retryDraft = v.round()),
                         ),
+                        const SizedBox(height: 16),
+                        _saveButton(() { _saveFallback(); }),
                       ],
                     ),
                   ),
@@ -721,6 +735,8 @@ class _AiConfigPageState extends State<AiConfigPage> {
                           value: _ctrl.cacheEnabled,
                           onChanged: (v) => _ctrl.setCacheEnabled(v),
                         ),
+                        const SizedBox(height: 16),
+                        _saveButton(() { _saveBatch(); }),
                       ],
                     ),
                   ),

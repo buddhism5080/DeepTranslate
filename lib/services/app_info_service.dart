@@ -38,18 +38,4 @@ class AppInfoService {
     final r = await _channel.invokeMethod<bool>('clearAllCache');
     return r ?? false;
   }
-
-  static Future<int> getTotalTokens() async {
-    final tokens = await _channel.invokeMethod<int>('getTotalTokens');
-    return tokens ?? 0;
-  }
-
-  static Future<void> resetTokens() async {
-    await _channel.invokeMethod('resetTokens');
-  }
-
-  static Future<Map<String, dynamic>> getBalance(String apiKey) async {
-    final result = await _channel.invokeMethod<Map>('getBalance', {'apiKey': apiKey});
-    return Map<String, dynamic>.from(result ?? {});
-  }
 }
