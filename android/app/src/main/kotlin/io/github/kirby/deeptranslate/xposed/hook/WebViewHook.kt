@@ -132,13 +132,13 @@ object WebViewHook : BaseHook() {
             if (payload.length > 100_000) return
             val texts = try {
                 val arr = JSONArray(payload)
-                buildList {
-                    for (i in 0 until arr.length()) {
-                        if (size >= 30) break
-                        val text = arr.optString(i, "")
-                        if (TextGate.shouldTranslate(text)) add(text)
-                    }
+                val collected = mutableListOf<String>()
+                for (i in 0 until arr.length()) {
+                    if (collected.size >= 30) break
+                    val text = arr.optString(i, "")
+                    if (TextGate.shouldTranslate(text)) collected.add(text)
                 }
+                collected
             } catch (_: Throwable) {
                 return
             }
