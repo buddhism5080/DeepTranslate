@@ -43,6 +43,8 @@ object TranslationEngine {
 
     private data class Channel(val name: String, val chatUrl: String, val apiKey: String, val model: String)
 
+    private data class ParsedLine(val id: Int, val hasId: Boolean, val translation: String, val lang: String)
+
     private data class CallResult(
         val translated: Map<String, TranslationEntry>,
         val httpStatus: Int,
@@ -85,7 +87,7 @@ object TranslationEngine {
         return Channel(name, endpoints.chat, apiKey, model)
     }
 
-    /** Primary or fallback. Retries only the lines still missing, then isolates a bad batch. */
+    /** One batch attempt, then each still-missing line on its own. A shared counter must not let one failure eat the others. */
     private fun drain(
         target: Channel,
         items: List<TranslateItem>,
@@ -93,32 +95,42 @@ object TranslationEngine {
         module: XposedModule?,
     ): Map<String, TranslationEntry> {
         val done = linkedMapOf<String, TranslationEntry>()
-        var pending = items
-        val budget = ConfigManager.getRetryCount() + 1
-        var tries = budget
-        var isolate = false
-        while (pending.isNotEmpty() && tries > 0) {
-            val wave = if (isolate) pending.take(1) else pending
-            tries--
-            val call = requestOnce(target, wave, request.scene, request.packageName, module)
-            for ((key, value) in call.translated) done[key] = value
-            val missed = wave.filter { it.text !in call.translated }
-            val later = if (isolate) pending.drop(1) else emptyList()
-            if (call.authFailure) {
-                module?.log(Log.WARN, TAG, "${target.name} rejected auth, switching channel")
-                pending = missed + later
-                break
-            }
-            if (call.translated.isEmpty() && wave.size > 1) isolate = true
-            pending = missed + later
-            if (pending.isNotEmpty() && tries > 0 && call.httpStatus == 429) {
-                try {
-                    Thread.sleep(200L * (budget - tries))
-                } catch (_: InterruptedException) {
+        if (items.isEmpty()) return done
+        val first = requestOnce(target, items, request.scene, request.packageName, module)
+        done.putAll(first.translated)
+        if (first.authFailure) {
+            module?.log(Log.WARN, TAG, "${target.name} rejected auth, switching channel")
+            return done
+        }
+        val missed = items.filter { it.text !in done }
+        if (missed.isEmpty()) return done
+        val solos = if (items.size > 1 && first.httpStatus in 200..299) {
+            maxOf(1, ConfigManager.getRetryCount())
+        } else {
+            ConfigManager.getRetryCount()
+        }
+        for (item in missed) {
+            var attempt = 0
+            while (attempt < solos && item.text !in done) {
+                if (attempt > 0) pause(attempt)
+                attempt++
+                val call = requestOnce(target, listOf(item), request.scene, request.packageName, module)
+                if (call.authFailure) {
+                    module?.log(Log.WARN, TAG, "${target.name} rejected auth, switching channel")
+                    return done
                 }
+                call.translated[item.text]?.let { done[item.text] = it }
+                if (item.text !in done && call.httpStatus == 429) pause(attempt)
             }
         }
         return done
+    }
+
+    private fun pause(attempt: Int) {
+        try {
+            Thread.sleep(200L * attempt)
+        } catch (_: InterruptedException) {
+        }
     }
 
     private fun requestOnce(
@@ -257,39 +269,35 @@ $base
                 }
                 return result
             }
-            val byId = mutableMapOf<Int, TranslationEntry>()
+            val rows = ArrayList<ParsedLine>(arr.length())
             for (i in 0 until arr.length()) {
                 val item = arr.optJSONObject(i) ?: continue
-                val id = item.optInt("id", -1)
                 val translation = item.optString("translation", "").ifBlank { item.optString("translated", "") }
-                val lang = item.optString("lang", "unknown")
-                if (id in originals.indices && translation.isNotEmpty()) {
-                    byId[id] = TranslationEntry(originals[id], translation, lang)
-                }
+                if (translation.isEmpty()) continue
+                val hasId = item.has("id")
+                rows.add(ParsedLine(
+                    id = if (hasId) item.optInt("id", -1) else -1,
+                    hasId = hasId,
+                    translation = translation,
+                    lang = item.optString("lang", "unknown"),
+                ))
             }
-            if (byId.isEmpty() && arr.length() == originals.size) {
-                val ids = (0 until arr.length()).map { arr.optJSONObject(it)?.optInt("id", -1) ?: -1 }
-                val oneBased = ids.all { it in 1..originals.size } && ids.toSet().size == originals.size
-                for (i in 0 until arr.length()) {
-                    val item = arr.optJSONObject(i) ?: continue
-                    val translation = item.optString("translation", "").ifBlank { item.optString("translated", "") }
-                    if (translation.isEmpty()) continue
-                    val rawId = item.optInt("id", if (oneBased) i + 1 else i)
-                    val index = if (oneBased) rawId - 1 else rawId
-                    if (index in originals.indices) {
-                        byId[index] = TranslationEntry(originals[index], translation, item.optString("lang", "unknown"))
-                    }
+            val n = originals.size
+            val explicitIds = rows.filter { it.hasId && it.id >= 0 }.map { it.id }
+            val oneBased = explicitIds.isNotEmpty() &&
+                0 !in explicitIds &&
+                explicitIds.all { it in 1..n } &&
+                explicitIds.maxOrNull() == n
+            val byId = mutableMapOf<Int, TranslationEntry>()
+            for ((position, row) in rows.withIndex()) {
+                val index = when {
+                    oneBased && row.hasId -> row.id - 1
+                    row.hasId && row.id in originals.indices -> row.id
+                    !row.hasId && rows.size == n -> position
+                    else -> -1
                 }
-            }
-            if (byId.size < originals.size && arr.length() == originals.size) {
-                for (i in 0 until arr.length()) {
-                    if (i in byId) continue
-                    val item = arr.optJSONObject(i) ?: continue
-                    val translation = item.optString("translation", "").ifBlank { item.optString("translated", "") }
-                    if (translation.isNotEmpty()) {
-                        byId[i] = TranslationEntry(originals[i], translation, item.optString("lang", "unknown"))
-                    }
-                }
+                if (index !in originals.indices || index in byId) continue
+                byId[index] = TranslationEntry(originals[index], row.translation, row.lang)
             }
             for ((id, entry) in byId) result[originals[id]] = entry
         } catch (_: Exception) {

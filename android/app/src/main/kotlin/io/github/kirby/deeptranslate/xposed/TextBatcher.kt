@@ -5,6 +5,7 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import io.github.libxposed.api.XposedModule
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -39,6 +40,7 @@ class TextBatcher(
 
     private val uiQueue = ConcurrentLinkedQueue<Work>()
     private val contentQueue = ConcurrentLinkedQueue<Work>()
+    private val waiting = ConcurrentHashMap<String, MutableList<(String) -> Unit>>()
     private val mainHandler = Handler(Looper.getMainLooper())
     private val flushRunnable = Runnable { flush(partial = true) }
 
@@ -55,11 +57,29 @@ class TextBatcher(
             getContext()?.let { TranslationCache.init(it) }
             val cached = TranslationCache.get(text)
             if (cached != null) {
-                deliver(text, cached, kind, onResult)
+                showOne(text, cached, kind, onResult)
                 return
             }
         }
+        synchronized(waiting) {
+            val pending = waiting[text]
+            if (pending != null) {
+                pending.add(onResult)
+                return
+            }
+            waiting[text] = mutableListOf(onResult)
+        }
 
+        try {
+            queueMissing(text, kind, onResult)
+        } catch (e: Exception) {
+            val callbacks = synchronized(waiting) { waiting.remove(text) }
+            module?.log(Log.WARN, tag, "submit failed: ${e.message}")
+            mainHandler.post { callbacks?.forEach { it(text) } }
+        }
+    }
+
+    private fun queueMissing(text: String, kind: TextKind, onResult: (String) -> Unit) {
         val detailed = if (kind == TextKind.UI) {
             listOf(TextChunks.Piece(text, "ui"))
         } else {
@@ -226,11 +246,24 @@ class TextBatcher(
         deliver(job.original, joined, job.kind, job.onResult)
     }
 
+    private fun showOne(original: String, translated: String, kind: TextKind, onResult: (String) -> Unit) {
+        val shown = compose(original, translated, kind)
+        mainHandler.post { onResult(shown) }
+    }
+
     private fun deliver(original: String, translated: String, kind: TextKind, onResult: (String) -> Unit) {
+        val shown = compose(original, translated, kind)
+        val callbacks = synchronized(waiting) { waiting.remove(original) }
+        mainHandler.post {
+            if (callbacks.isNullOrEmpty()) onResult(shown) else callbacks.forEach { it(shown) }
+        }
+    }
+
+    private fun compose(original: String, translated: String, kind: TextKind): String {
         if (translated != original) TranslationCache.markOutput(translated)
         val shown = DisplayText.present(original, translated, kind)
         if (shown != translated) DisplayText.remember(shown)
-        mainHandler.post { onResult(shown) }
+        return shown
     }
 
     private fun pool(): ExecutorService {

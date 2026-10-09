@@ -1,4 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <permission
+        android:name="io.github.kirby.deeptranslate.permission.CACHE"
+        android:protectionLevel="signature" />
+    <uses-permission android:name="io.github.kirby.deeptranslate.permission.CACHE" />
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"/>
     <uses-permission android:name="com.android.permission.GET_INSTALLED_APPS"/>

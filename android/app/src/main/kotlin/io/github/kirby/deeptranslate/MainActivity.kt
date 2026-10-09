@@ -18,31 +18,33 @@ class MainActivity : FlutterActivity() {
     private val TAG = "DeepTranslate"
     private val CACHE_PREFS_KEY = "flutter.pref_cache_details"
 
+    private val packageNamePattern = Regex("^[a-zA-Z][a-zA-Z0-9_]*(\\.[a-zA-Z][a-zA-Z0-9_]*)+$")
+
+    private fun safePackage(pkg: String): String? = pkg.takeIf { packageNamePattern.matches(it) }
+
     private val tokenReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             val cached = intent?.getIntExtra("cached", 0) ?: 0
-            val pkg = intent?.getStringExtra("package") ?: ""
+            val pkg = safePackage(intent?.getStringExtra("package") ?: "") ?: return
+            if (cached !in 1..1000) return
             val prefs = getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
-            val editor = prefs.edit()
-
-            if (cached > 0 && pkg.isNotEmpty()) {
-                val jsonStr = prefs.getString(CACHE_PREFS_KEY, "{}") ?: "{}"
-                try {
-                    val jsonObj = JSONObject(jsonStr)
-                    jsonObj.put(pkg, jsonObj.optInt(pkg, 0) + cached)
-                    editor.putString(CACHE_PREFS_KEY, jsonObj.toString())
-                    editor.putLong("flutter.pref_cache_count", prefs.getLong("flutter.pref_cache_count", 0L) + cached)
-                } catch (e: Exception) {
-                    Log.e(TAG, "cache update failed: ${e.message}")
-                }
+            try {
+                val jsonObj = JSONObject(prefs.getString(CACHE_PREFS_KEY, "{}") ?: "{}")
+                jsonObj.put(pkg, jsonObj.optInt(pkg, 0) + cached)
+                val next = (prefs.getLong("flutter.pref_cache_count", 0L) + cached).coerceAtMost(Int.MAX_VALUE.toLong())
+                prefs.edit()
+                    .putString(CACHE_PREFS_KEY, jsonObj.toString())
+                    .putLong("flutter.pref_cache_count", next)
+                    .apply()
+            } catch (e: Exception) {
+                Log.e(TAG, "cache update failed: ${e.message}")
             }
-            editor.apply()
         }
     }
 
     private val cacheClearedReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
-            val pkg = intent?.getStringExtra("package") ?: return
+            val pkg = safePackage(intent?.getStringExtra("package") ?: "") ?: return
             val prefs = getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
             val jsonStr = prefs.getString(CACHE_PREFS_KEY, "{}") ?: "{}"
             try {
@@ -98,9 +100,10 @@ class MainActivity : FlutterActivity() {
 
     /** 用 root 直接删除目标 App 的缓存数据库（最可靠，不依赖 App 是否在运行）。 */
     private fun clearCacheWithRoot(pkg: String) {
+        val safe = safePackage(pkg) ?: return
         Thread {
             try {
-                val cmd = "rm -f /data/data/$pkg/databases/deeptranslate_cache.db /data/data/$pkg/databases/deeptranslate_cache.db-*"
+                val cmd = "rm -f /data/data/$safe/databases/deeptranslate_cache.db /data/data/$safe/databases/deeptranslate_cache.db-*"
                 val proc = Runtime.getRuntime().exec(arrayOf("su", "-c", cmd))
                 proc.waitFor()
                 Log.d(TAG, "root cache clear for $pkg: exit=${proc.exitValue()}")
@@ -112,8 +115,9 @@ class MainActivity : FlutterActivity() {
 
     /** 发送广播到目标 App 进程，让 Hook 清空 SQLite 缓存。 */
     private fun sendClearBroadcast(pkg: String) {
+        val safe = safePackage(pkg) ?: return
         val intent = Intent("io.github.kirby.deeptranslate.CLEAR_CACHE").apply {
-            setPackage(pkg)
+            setPackage(safe)
         }
         sendBroadcast(intent)
         Log.d(TAG, "sent CLEAR_CACHE broadcast to $pkg")

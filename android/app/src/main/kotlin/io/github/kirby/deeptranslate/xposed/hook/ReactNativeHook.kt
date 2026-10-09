@@ -2,7 +2,9 @@ package io.github.kirby.deeptranslate.xposed.hook
 
 import android.text.Layout
 import android.text.StaticLayout
+import android.text.TextUtils
 import android.view.View
+import java.lang.reflect.Constructor
 import io.github.kirby.deeptranslate.xposed.ConfigManager
 import io.github.kirby.deeptranslate.xposed.DisplayText
 import io.github.kirby.deeptranslate.xposed.TextGate
@@ -103,31 +105,67 @@ object ReactNativeHook : BaseHook() {
 
     private fun replaceText(prepared: Any, newText: String): Any? {
         return try {
-            val layout = prepared.javaClass.getMethod("getLayout").invoke(prepared) as? Layout
-                ?: return null
-            val rebuilt = StaticLayout.Builder.obtain(newText, 0, newText.length, layout.paint, layout.width.coerceAtLeast(0))
+            val layout = prepared.javaClass.getMethod("getLayout").invoke(prepared) as? Layout ?: return null
+            val width = layout.width.coerceAtLeast(0)
+            val reported = call(prepared, "getMaximumNumberOfLines") as? Int
+            val maxLines = reported ?: layout.lineCount.coerceAtLeast(1)
+            val builder = StaticLayout.Builder.obtain(newText, 0, newText.length, layout.paint, width)
                 .setAlignment(layout.alignment)
                 .setLineSpacing(layout.spacingAdd, layout.spacingMultiplier)
                 .setIncludePad(true)
                 .setBreakStrategy(layout.breakStrategy)
                 .setHyphenationFrequency(layout.hyphenationFrequency)
                 .setJustificationMode(layout.justificationMode)
-                .build()
-            val ctor = prepared.javaClass.declaredConstructors.firstOrNull { it.parameterTypes.size == 6 }
-                ?: return null
-            ctor.isAccessible = true
-            ctor.newInstance(
-                rebuilt,
-                prepared.javaClass.getMethod("getMaximumNumberOfLines").invoke(prepared),
-                prepared.javaClass.getMethod("getVerticalOffset").invoke(prepared),
-                prepared.javaClass.getMethod("getReactTags").invoke(prepared),
-                prepared.javaClass.getMethod("getTextBreakStrategy").invoke(prepared),
-                prepared.javaClass.getMethod("getJustificationMode").invoke(prepared),
-            )
+            if (maxLines > 0) builder.setMaxLines(maxLines)
+            if (layout.lineCount > 0 && layout.getEllipsisCount(layout.lineCount - 1) > 0) {
+                builder.setEllipsize(TextUtils.TruncateAt.END).setEllipsizedWidth(width)
+            }
+            val rebuilt = builder.build()
+            val ctors = prepared.javaClass.declaredConstructors
+                .filter { it.parameterTypes.size in setOf(2, 3, 4, 6) }
+                .sortedByDescending { it.parameterTypes.size }
+            for (ctor in ctors) {
+                buildPrepared(ctor, prepared, rebuilt, maxLines)?.let { return it }
+            }
+            null
         } catch (_: Throwable) {
             null
         }
     }
+
+    private fun buildPrepared(ctor: Constructor<*>, prepared: Any, layout: Layout, maxLines: Int): Any? {
+        val vertical = call(prepared, "getVerticalOffset")
+        val tags = call(prepared, "getReactTags")
+        val breakStrategy = call(prepared, "getTextBreakStrategy") ?: layout.breakStrategy
+        val justification = call(prepared, "getJustificationMode") ?: layout.justificationMode
+        val args: List<Any?> = when (ctor.parameterTypes.size) {
+            2 -> listOf(layout, maxLines)
+            3 -> listOf(layout, maxLines, vertical ?: return null)
+            4 -> listOf(layout, maxLines, vertical ?: return null, tags ?: return null)
+            6 -> listOf(
+                layout,
+                maxLines,
+                vertical ?: return null,
+                tags ?: return null,
+                breakStrategy,
+                justification,
+            )
+            else -> return null
+        }
+        return try {
+            ctor.isAccessible = true
+            ctor.newInstance(*args.toTypedArray())
+        } catch (_: Throwable) {
+            null
+        }
+    }
+
+    private fun call(target: Any, name: String): Any? =
+        try {
+            target.javaClass.methods.firstOrNull { it.name == name && it.parameterTypes.isEmpty() }?.invoke(target)
+        } catch (_: Throwable) {
+            null
+        }
 
     private fun load(loader: ClassLoader, name: String): Class<*>? =
         try {

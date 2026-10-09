@@ -61,20 +61,16 @@ class _AiConfigPageState extends State<AiConfigPage> {
     _aiTemperatureDraft = _ctrl.aiTemperature;
     _aiMaxTokensDraft = _ctrl.aiMaxTokens;
     _batchSizeDraft = _ctrl.batchSize;
-    _batchWindowDraft = _ctrl.batchWindowMs;
-    _concurrencyDraft = _ctrl.concurrency;
-    _maxParagraphsDraft = _ctrl.maxParagraphs;
-    _maxCharsDraft = _ctrl.maxChars;
+    _batchWindowDraft = _ctrl.batchWindowMs.clamp(50, 500).toInt();
+    _concurrencyDraft = _ctrl.concurrency.clamp(1, 8).toInt();
+    _maxParagraphsDraft = _ctrl.maxParagraphs.clamp(1, 16).toInt();
+    _maxCharsDraft = _ctrl.maxChars.clamp(400, 8000).toInt();
     _retryDraft = _ctrl.retryCount;
   }
 
   void _onCtrlChanged() {
     if (!mounted) return;
-    setState(() {
-      _aiTimeoutDraft = _ctrl.aiTimeout;
-      _aiTemperatureDraft = _ctrl.aiTemperature;
-      _aiMaxTokensDraft = _ctrl.aiMaxTokens;
-    });
+    setState(() {});
   }
 
   @override

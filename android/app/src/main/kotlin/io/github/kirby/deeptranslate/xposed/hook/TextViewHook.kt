@@ -22,6 +22,8 @@ object TextViewHook : BaseHook() {
     override fun getTag() = "DeepTranslate[TextViewHook]"
 
     private val pendingTexts = ConcurrentHashMap<String, Boolean>()
+    private val applying = ConcurrentHashMap.newKeySet<Int>()
+    private val abandoned = ConcurrentHashMap.newKeySet<String>()
     private var batcher: TextBatcher? = null
 
     override fun onInit(module: XposedModule, param: PackageLoadedParam) {
@@ -50,22 +52,21 @@ object TextViewHook : BaseHook() {
                 val textView = chain.thisObject as TextView
                 val text = chain.args[0] as? CharSequence
                 val result = chain.proceed()
+                if (applying.contains(System.identityHashCode(textView))) return@intercept result
 
                 if (shouldTranslate(textView, text)) {
                     val textStr = text!!.toString()
-                    val key = "${textView.hashCode()}_${textStr.hashCode()}"
-                    if (pendingTexts.putIfAbsent(key, true) == null) {
+                    val key = pendingKey(textView, textStr)
+                    if (key !in abandoned && pendingTexts.putIfAbsent(key, true) == null) {
                         val tvRef = WeakReference(textView)
                         batcher?.submit(textStr, TextKinds.of(textStr, textView.javaClass.name, textView.maxLines)) { translated ->
-                            val tv = tvRef.get() ?: return@submit
-                            try {
-                                if (tv.text?.toString() == textStr) {
-                                    val saved = tv.text
-                                    tv.text = copyVisualSpans(saved, translated)
-                                    checkOverflow(tv, saved)
-                                    pendingTexts.remove(key)
-                                }
-                            } catch (_: Exception) { pendingTexts.remove(key) }
+                            release(key) {
+                                val tv = tvRef.get() ?: return@release
+                                if (tv.text?.toString() != textStr) return@release
+                                val saved = tv.text
+                                tv.text = copyVisualSpans(saved, translated)
+                                checkOverflow(tv, saved)
+                            }
                         }
                     }
                 }
@@ -84,23 +85,22 @@ object TextViewHook : BaseHook() {
                 val textView = chain.thisObject as TextView
                 val text = chain.args[0] as? CharSequence
                 val result = chain.proceed()
+                if (applying.contains(System.identityHashCode(textView))) return@intercept result
 
                 if (shouldTranslate(textView, text)) {
                     val textStr = text!!.toString()
-                    val key = "${textView.hashCode()}_${textStr.hashCode()}"
-                    if (pendingTexts.putIfAbsent(key, true) == null) {
+                    val key = pendingKey(textView, textStr)
+                    if (key !in abandoned && pendingTexts.putIfAbsent(key, true) == null) {
                         val tvRef = WeakReference(textView)
                         val bufType = chain.args[1] as TextView.BufferType
                         batcher?.submit(textStr, TextKinds.of(textStr, textView.javaClass.name, textView.maxLines)) { translated ->
-                            val tv = tvRef.get() ?: return@submit
-                            try {
-                                if (tv.text?.toString() == textStr) {
-                                    val saved = tv.text
-                                    tv.setText(copyVisualSpans(saved, translated), bufType)
-                                    checkOverflow(tv, saved)
-                                    pendingTexts.remove(key)
-                                }
-                            } catch (_: Exception) { pendingTexts.remove(key) }
+                            release(key) {
+                                val tv = tvRef.get() ?: return@release
+                                if (tv.text?.toString() != textStr) return@release
+                                val saved = tv.text
+                                tv.setText(copyVisualSpans(saved, translated), bufType)
+                                checkOverflow(tv, saved)
+                            }
                         }
                     }
                 }
@@ -123,20 +123,21 @@ object TextViewHook : BaseHook() {
                 val start = chain.args[1] as Int
                 val len = chain.args[2] as Int
                 val result = chain.proceed()
+                if (applying.contains(System.identityHashCode(textView))) return@intercept result
 
-                if (chars != null && len > 0 && !isEditText(textView)) {
+                if (chars != null && len > 0 && !isEditText(textView) && !isPasswordField(textView)) {
                     val textStr = String(chars, start, len)
                     if (textStr.length >= 2 && TextGate.shouldTranslate(textStr)) {
-                        val key = "${textView.hashCode()}_${textStr.hashCode()}"
-                        if (pendingTexts.putIfAbsent(key, true) == null) {
+                        val key = pendingKey(textView, textStr)
+                        if (key !in abandoned && pendingTexts.putIfAbsent(key, true) == null) {
                             val tvRef = WeakReference(textView)
                             batcher?.submit(textStr, TextKinds.of(textStr, textView.javaClass.name, textView.maxLines)) { translated ->
-                                val tv = tvRef.get() ?: return@submit
-                                try {
+                                release(key) {
+                                    val tv = tvRef.get() ?: return@release
+                                    if (tv.text?.toString() != textStr) return@release
                                     tv.text = translated
                                     checkOverflow(tv, textStr)
-                                    pendingTexts.remove(key)
-                                } catch (_: Exception) { pendingTexts.remove(key) }
+                                }
                             }
                         }
                     }
@@ -149,16 +150,36 @@ object TextViewHook : BaseHook() {
 
     // ── 溢出检测：中文可能撑破 UI，还原原文 ─────────────────────────────
 
-    /** 翻译后检测文字是否被截断（ellipsize），如果是则还原原文。 */
+    private fun pendingKey(tv: TextView, text: String) = "${System.identityHashCode(tv)}_${text.hashCode()}"
+
+    private inline fun release(key: String, block: () -> Unit) {
+        try {
+            block()
+        } catch (_: Exception) {
+        } finally {
+            pendingTexts.remove(key)
+        }
+    }
+
+    /** 翻译后检测文字是否被截断（ellipsize），如果是则还原原文。还原不再送去翻译。 */
     private fun checkOverflow(tv: TextView, original: CharSequence?) {
         if (ConfigManager.isBilingual()) return
+        val originalText = original?.toString() ?: return
         tv.post {
             try {
-                val layout = tv.layout
-                if (layout != null && layout.lineCount > 0 && layout.getEllipsisCount(layout.lineCount - 1) > 0) {
-                    tv.text = original
+                val layout = tv.layout ?: return@post
+                if (layout.lineCount > 0 && layout.getEllipsisCount(layout.lineCount - 1) > 0) {
+                    val id = System.identityHashCode(tv)
+                    abandoned.add(pendingKey(tv, originalText))
+                    applying.add(id)
+                    try {
+                        tv.text = original
+                    } finally {
+                        applying.remove(id)
+                    }
                 }
-            } catch (_: Exception) {}
+            } catch (_: Exception) {
+            }
         }
     }
 

@@ -49,7 +49,9 @@ class DeepTranslateModule : XposedModule() {
                 ctx.registerReceiver(
                     cacheClearReceiver,
                     IntentFilter("io.github.kirby.deeptranslate.CLEAR_CACHE"),
-                    Context.RECEIVER_EXPORTED
+                    "io.github.kirby.deeptranslate.permission.CACHE",
+                    null,
+                    Context.RECEIVER_EXPORTED,
                 )
             }
         } catch (e: Exception) {

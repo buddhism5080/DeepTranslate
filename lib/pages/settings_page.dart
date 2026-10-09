@@ -16,12 +16,16 @@ class SettingsPage extends StatefulWidget {
 class _SettingsPageState extends State<SettingsPage> {
   final _ctrl = SettingsController.instance;
   int _cacheCount = 0;
+  String _version = '';
 
   @override
   void initState() {
     super.initState();
     _ctrl.addListener(_onChanged);
     _loadCacheCount();
+    AppInfoService.getVersion().then((version) {
+      if (mounted && version.isNotEmpty) setState(() => _version = version);
+    });
   }
 
   void _loadCacheCount() async {
@@ -278,7 +282,7 @@ class _SettingsPageState extends State<SettingsPage> {
                       ListTile(
                         leading: const Icon(Icons.code),
                         title: Text(l10n.version),
-                        subtitle: Text(_ctrl.runtimeType.toString()),
+                        subtitle: Text(_version.isEmpty ? '…' : _version),
                         shape: const RoundedRectangleBorder(
                           borderRadius: BorderRadius.vertical(
                             bottom: Radius.circular(16),

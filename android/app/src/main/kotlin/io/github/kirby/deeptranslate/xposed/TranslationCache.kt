@@ -11,7 +11,7 @@ import java.util.LinkedHashMap
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * 翻译缓存。SQLite 持久化，key = SHA256(原文)。
+ * 翻译缓存。SQLite 持久化，key = SHA256(目标语言 + 原文)。
  * 另有一张 outputs 表，记下译文本身，避免译文再次送去翻译。
  */
 object TranslationCache {
@@ -68,10 +68,10 @@ object TranslationCache {
     }
 
     fun get(original: String): String? {
-        memory[original]?.let { return it }
+        memory[scoped(original)]?.let { return it }
         if (!ensureInit()) return null
         return try {
-            val hash = sha256(original)
+            val hash = sha256(scoped(original))
             val db = dbHelper!!.readableDatabase
             val cursor = db.query(
                 TABLE,
@@ -83,7 +83,7 @@ object TranslationCache {
             cursor.use {
                 if (it.moveToFirst()) {
                     val translated = it.getString(0)
-                    memory[original] = translated
+                    memory[scoped(original)] = translated
                     translated
                 } else null
             }
@@ -94,11 +94,11 @@ object TranslationCache {
     }
 
     fun put(original: String, translated: String, sourceLang: String, pkg: String) {
-        memory[original] = translated
+        memory[scoped(original)] = translated
         if (translated != original) markOutput(translated)
         if (!ensureInit()) return
         try {
-            val hash = sha256(original)
+            val hash = sha256(scoped(original))
             val cv = ContentValues().apply {
                 put(COL_HASH, hash)
                 put(COL_ORIGINAL, original)
@@ -127,7 +127,7 @@ object TranslationCache {
     fun putBatch(entries: List<CacheEntry>, pkg: String) {
         if (entries.isEmpty()) return
         for (entry in entries) {
-            memory[entry.original] = entry.translated
+            memory[scoped(entry.original)] = entry.translated
             if (entry.translated != entry.original) markOutput(entry.translated)
         }
         if (!ensureInit()) return
@@ -135,7 +135,7 @@ object TranslationCache {
             val db = dbHelper!!.writableDatabase
             db.beginTransaction()
             for (entry in entries) {
-                val hash = sha256(entry.original)
+                val hash = sha256(scoped(entry.original))
                 val cv = ContentValues().apply {
                     put(COL_HASH, hash)
                     put(COL_ORIGINAL, entry.original)
@@ -178,6 +178,7 @@ object TranslationCache {
         if (text.isEmpty()) return
         val hash = sha256(text)
         knownNotOutputs.remove(hash)
+        if (knownOutputs.size > 4000) knownOutputs.clear()
         knownOutputs.add(hash)
         if (!ensureInit()) return
         try {
@@ -213,6 +214,8 @@ object TranslationCache {
             0
         }
     }
+
+    private fun scoped(original: String) = ConfigManager.getTargetLang() + "\u0000" + original
 
     private fun sha256(text: String): String {
         val md = MessageDigest.getInstance("SHA-256")

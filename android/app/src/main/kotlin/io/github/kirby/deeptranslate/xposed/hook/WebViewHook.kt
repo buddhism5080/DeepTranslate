@@ -13,6 +13,8 @@ import io.github.libxposed.api.XposedModuleInterface.PackageLoadedParam
 import org.json.JSONArray
 import org.json.JSONObject
 import java.lang.ref.WeakReference
+import java.util.Collections
+import java.util.WeakHashMap
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -25,7 +27,7 @@ object WebViewHook : BaseHook() {
     override fun getTag() = "DeepTranslate[WebView]"
 
     private val hookedClients = ConcurrentHashMap.newKeySet<String>()
-    private val bridged = ConcurrentHashMap.newKeySet<Int>()
+    private val bridged = Collections.synchronizedMap(WeakHashMap<WebView, Boolean>())
 
     override fun onInit(module: XposedModule, param: PackageLoadedParam) {
         if (!ConfigManager.isTranslationEnabled()) return
@@ -99,7 +101,7 @@ object WebViewHook : BaseHook() {
     }
 
     private fun attachBridge(webView: WebView, batcher: TextBatcher) {
-        if (!bridged.add(System.identityHashCode(webView))) return
+        if (bridged.put(webView, true) != null) return
         try {
             webView.addJavascriptInterface(JsBridge(webView, batcher), "DeepTranslate")
         } catch (_: Throwable) {
@@ -180,9 +182,13 @@ object WebViewHook : BaseHook() {
             window.__dtBooted = true;
             function skip(el){
               if (!el) return true;
-              var t = el.tagName;
-              if (t === 'SCRIPT' || t === 'STYLE' || t === 'NOSCRIPT' || t === 'TEXTAREA' || t === 'INPUT' || t === 'CODE') return true;
-              if (el.isContentEditable) return true;
+              var node = el;
+              while (node) {
+                var t = node.tagName;
+                if (t === 'SCRIPT' || t === 'STYLE' || t === 'NOSCRIPT' || t === 'TEXTAREA' || t === 'INPUT' || t === 'CODE') return true;
+                if (node.isContentEditable) return true;
+                node = node.parentElement;
+              }
               return false;
             }
             function collect(){
@@ -212,6 +218,7 @@ object WebViewHook : BaseHook() {
               var walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null);
               var n;
               while ((n = walker.nextNode())) {
+                if (skip(n.parentElement)) continue;
                 var v = n.nodeValue;
                 if (!v) continue;
                 if (Object.prototype.hasOwnProperty.call(ok, v)) {
@@ -219,8 +226,9 @@ object WebViewHook : BaseHook() {
                   n.__dtLock = true;
                   n.__dtPending = false;
                 } else if (settleSet[v]) {
-                  n.__dtLock = true;
                   n.__dtPending = false;
+                  n.__dtFail = (n.__dtFail || 0) + 1;
+                  if (n.__dtFail >= 2) n.__dtLock = true;
                 }
               }
               collect();

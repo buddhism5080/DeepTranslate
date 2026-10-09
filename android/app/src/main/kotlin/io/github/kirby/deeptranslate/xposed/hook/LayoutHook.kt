@@ -12,6 +12,9 @@ import io.github.libxposed.api.XposedModule
 import io.github.libxposed.api.XposedModuleInterface.PackageLoadedParam
 import java.lang.reflect.Executable
 import java.lang.reflect.Modifier
+import java.util.Collections
+import java.util.LinkedHashMap
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Text that never goes through TextView.setText:
@@ -27,6 +30,10 @@ object LayoutHook : BaseHook() {
         "androidx.compose.ui.text.android.TextLayout",
         "androidx.compose.ui.text.platform.AndroidParagraphIntrinsics",
     )
+    private val shown = Collections.synchronizedMap(object : LinkedHashMap<String, String>(128, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, String>?) = size > 400
+    })
+    private val inflight = ConcurrentHashMap.newKeySet<String>()
 
     override fun onInit(module: XposedModule, param: PackageLoadedParam) {
         if (!ConfigManager.isTranslationEnabled()) return
@@ -92,6 +99,15 @@ object LayoutHook : BaseHook() {
         layoutPref: Boolean,
     ) {
         module.hook(executable).intercept { chain ->
+            fun swapped(displayed: String): Any? {
+                val replaced = chain.args.toTypedArray()
+                replaced[0] = displayed
+                if (adjustRange && replaced.size >= 3) {
+                    replaced[1] = 0
+                    replaced[2] = displayed.length
+                }
+                return chain.proceed(replaced)
+            }
             if (!ConfigManager.isTranslationEnabled()) return@intercept chain.proceed()
             val enabled = if (layoutPref) ConfigManager.isHookLayout() else ConfigManager.isHookCompose()
             if (!enabled) return@intercept chain.proceed()
@@ -102,25 +118,35 @@ object LayoutHook : BaseHook() {
             val end = if (adjustRange && args.size >= 3 && args[2] is Int) args[2] as Int else source.length
             if (start < 0 || end > source.length || start >= end) return@intercept chain.proceed()
             val slice = source.subSequence(start, end).toString()
-            if (!TextGate.shouldTranslate(slice)) return@intercept chain.proceed()
+            val key = "${ConfigManager.getTargetLang()}\u0000${ConfigManager.isBilingual()}\u0000$slice"
+            // Span ranges on AndroidParagraphIntrinsics are indexes into the original string.
+            if (executable.declaringClass.name.endsWith("AndroidParagraphIntrinsics")) {
+                return@intercept chain.proceed()
+            }
+            shown[key]?.let { remembered ->
+                return@intercept swapped(remembered)
+            }
+            if (!inflight.add(key)) return@intercept chain.proceed()
+            if (!TextGate.shouldTranslate(slice)) {
+                inflight.remove(key)
+                return@intercept chain.proceed()
+            }
 
             TranslationCache.ensureFromApp()
             val kind = TextKinds.of(slice)
             val cached = if (ConfigManager.isCacheEnabled()) TranslationCache.get(slice) else null
             if (cached != null) {
+                inflight.remove(key)
                 if (cached == slice) return@intercept chain.proceed()
-                val shown = DisplayText.present(slice, cached, kind)
-                DisplayText.remember(shown)
-                val replaced = args.toTypedArray()
-                replaced[0] = shown
-                if (adjustRange) {
-                    replaced[1] = 0
-                    replaced[2] = shown.length
-                }
-                return@intercept chain.proceed(replaced)
+                val displayed = DisplayText.present(slice, cached, kind)
+                DisplayText.remember(displayed)
+                shown[key] = displayed
+                return@intercept swapped(displayed)
             }
 
             batcher.submit(slice, kind) { translated ->
+                inflight.remove(key)
+                shown[key] = translated
                 if (translated != slice) WindowRefresher.schedule()
             }
             chain.proceed()
