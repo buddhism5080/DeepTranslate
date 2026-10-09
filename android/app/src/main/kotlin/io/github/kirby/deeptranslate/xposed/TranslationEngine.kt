@@ -4,16 +4,30 @@ import android.util.Log
 import io.github.libxposed.api.XposedModule
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
 import java.net.URL
-import java.io.OutputStreamWriter
 import java.util.concurrent.TimeUnit
 
 object TranslationEngine {
 
     private const val TAG = "DeepTranslate[Engine]"
 
-    data class BatchRequest(val texts: List<String>, val packageName: String)
+    data class TranslateItem(
+        val text: String,
+        val role: String = "post",
+        val part: Int = 1,
+        val parts: Int = 1,
+        val before: String = "",
+        val after: String = "",
+    )
+
+    data class BatchRequest(
+        val texts: List<String> = emptyList(),
+        val packageName: String,
+        val scene: String = "content",
+        val items: List<TranslateItem> = emptyList(),
+    )
 
     data class BatchResult(
         val translations: Map<String, TranslationEntry>,
@@ -27,105 +41,190 @@ object TranslationEngine {
         val sourceLang: String
     )
 
+    private data class Channel(val name: String, val chatUrl: String, val apiKey: String, val model: String)
+
+    private data class CallResult(
+        val translated: Map<String, TranslationEntry>,
+        val httpStatus: Int,
+        val authFailure: Boolean,
+    )
+
     fun translateBatch(request: BatchRequest, module: XposedModule?): BatchResult {
-        if (request.texts.isEmpty()) return BatchResult(emptyMap(), true)
+        val items = request.items.ifEmpty { request.texts.map { TranslateItem(it) } }
+            .filter { it.text.isNotEmpty() }
+        if (items.isEmpty()) return BatchResult(emptyMap(), true)
 
-        val endpoints = OpenAiEndpoints.resolve(ConfigManager.getAiUrl())
-            ?: return BatchResult(emptyMap(), false, "API URL not configured")
-        val apiKey = ConfigManager.getAiApiKey()
-        val model = ConfigManager.getAiModel()
-        val targetLang = ConfigManager.getTargetLang()
+        val primary = channel("primary", ConfigManager.getAiUrl(), ConfigManager.getAiApiKey(), ConfigManager.getAiModel())
+        val fallback = channel(
+            "fallback",
+            ConfigManager.getFallbackUrl(),
+            ConfigManager.getFallbackApiKey(),
+            ConfigManager.getFallbackModel(),
+        )
+        val channels = listOfNotNull(primary, fallback)
+        if (channels.isEmpty()) return BatchResult(emptyMap(), false, "API URL not configured")
+
+        val done = linkedMapOf<String, TranslationEntry>()
+        var pending = items.distinctBy { it.text }
+        for (target in channels) {
+            if (pending.isEmpty()) break
+            val got = drain(target, pending, request, module)
+            done.putAll(got)
+            pending = pending.filter { it.text !in done }
+        }
+        val complete = pending.isEmpty()
+        if (!complete) {
+            module?.log(Log.WARN, TAG, "still missing ${pending.size}/${items.distinctBy { it.text }.size} after retry and fallback")
+        }
+        return BatchResult(done, complete, if (complete) "" else "incomplete")
+    }
+
+    private fun channel(name: String, url: String, apiKey: String, model: String): Channel? {
+        if (model.isBlank()) return null
+        val endpoints = OpenAiEndpoints.resolve(url) ?: return null
+        return Channel(name, endpoints.chat, apiKey, model)
+    }
+
+    /** Primary or fallback. Retries only the lines still missing, then isolates a bad batch. */
+    private fun drain(
+        target: Channel,
+        items: List<TranslateItem>,
+        request: BatchRequest,
+        module: XposedModule?,
+    ): Map<String, TranslationEntry> {
+        val done = linkedMapOf<String, TranslationEntry>()
+        var pending = items
+        val budget = ConfigManager.getRetryCount() + 1
+        var tries = budget
+        var isolate = false
+        while (pending.isNotEmpty() && tries > 0) {
+            val wave = if (isolate) pending.take(1) else pending
+            tries--
+            val call = requestOnce(target, wave, request.scene, request.packageName, module)
+            for ((key, value) in call.translated) done[key] = value
+            val missed = wave.filter { it.text !in call.translated }
+            val later = if (isolate) pending.drop(1) else emptyList()
+            if (call.authFailure) {
+                module?.log(Log.WARN, TAG, "${target.name} rejected auth, switching channel")
+                pending = missed + later
+                break
+            }
+            if (call.translated.isEmpty() && wave.size > 1) isolate = true
+            pending = missed + later
+            if (pending.isNotEmpty() && tries > 0 && call.httpStatus == 429) {
+                try {
+                    Thread.sleep(200L * (budget - tries))
+                } catch (_: InterruptedException) {
+                }
+            }
+        }
+        return done
+    }
+
+    private fun requestOnce(
+        target: Channel,
+        items: List<TranslateItem>,
+        scene: String,
+        packageName: String,
+        module: XposedModule?,
+    ): CallResult {
         val timeout = ConfigManager.getAiTimeout()
-        val temperature = ConfigManager.getAiTemperature()
-        val maxTokens = ConfigManager.getAiMaxTokens()
-
-        if (model.isBlank()) return BatchResult(emptyMap(), false, "model not configured")
-
-        val prompt = buildPrompt(targetLang)
-        val userContent = buildUserContent(request.texts)
-        val requestBody = buildRequestBody(model, prompt, userContent, temperature, maxTokens)
-
-        module?.log(Log.INFO, TAG, "translating ${request.texts.size} texts for ${request.packageName}")
+        val prompt = buildPrompt(ConfigManager.getTargetLang(), scene)
+        val userContent = buildUserContent(scene, packageName, items)
+        val body = buildRequestBody(
+            target.model, prompt, userContent,
+            ConfigManager.getAiTemperature(), ConfigManager.getAiMaxTokens(),
+        )
+        module?.log(Log.INFO, TAG, "${target.name} ${items.size} ${scene} texts for $packageName")
 
         var connection: HttpURLConnection? = null
         try {
-            connection = (URL(endpoints.chat).openConnection() as HttpURLConnection).apply {
+            connection = (URL(target.chatUrl).openConnection() as HttpURLConnection).apply {
                 requestMethod = "POST"
                 connectTimeout = TimeUnit.SECONDS.toMillis(timeout.toLong()).toInt()
                 readTimeout = TimeUnit.SECONDS.toMillis(timeout.toLong()).toInt()
                 doOutput = true
                 setRequestProperty("Content-Type", "application/json")
                 setRequestProperty("Accept", "application/json")
-                if (apiKey.isNotEmpty()) setRequestProperty("Authorization", "Bearer $apiKey")
+                if (target.apiKey.isNotEmpty()) setRequestProperty("Authorization", "Bearer ${target.apiKey}")
             }
-
             OutputStreamWriter(connection.outputStream, Charsets.UTF_8).use { writer ->
-                writer.write(requestBody)
+                writer.write(body)
                 writer.flush()
             }
-
             val responseCode = connection.responseCode
             val responseBody = if (responseCode in 200..299) {
                 connection.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
             } else {
                 connection.errorStream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() } ?: ""
             }
-
             if (responseCode !in 200..299) {
-                module?.log(Log.ERROR, TAG, "API error $responseCode: ${responseBody.take(500)}")
-                return BatchResult(emptyMap(), false, "HTTP $responseCode")
+                module?.log(Log.ERROR, TAG, "${target.name} HTTP $responseCode: ${responseBody.take(300)}")
+                return CallResult(emptyMap(), responseCode, responseCode == 401 || responseCode == 403)
             }
-
-            val translations = parseResponse(responseBody, request.texts)
-            module?.log(Log.INFO, TAG, "translated ${translations.size}/${request.texts.size} texts")
-
-            // 解析 token 用量，发送广播给配置 App 累计
+            val translations = parseResponse(responseBody, items.map { it.text })
+            module?.log(Log.INFO, TAG, "${target.name} parsed ${translations.size}/${items.size}")
             try {
-                val root = JSONObject(responseBody)
-                val usage = root.optJSONObject("usage")
+                val usage = JSONObject(responseBody).optJSONObject("usage")
                 val totalTokens = usage?.optInt("total_tokens", 0) ?: 0
-                val cachedCount = translations.size
-                sendStatsUpdate(module, totalTokens, cachedCount, request.packageName)
-            } catch (_: Exception) {}
-
-            return BatchResult(translations, true)
-
+                sendStatsUpdate(module, totalTokens, translations.size, packageName)
+            } catch (_: Exception) {
+            }
+            return CallResult(translations, responseCode, false)
         } catch (e: Exception) {
-            module?.log(Log.ERROR, TAG, "translateBatch failed: ${e.message}")
-            return BatchResult(emptyMap(), false, e.message ?: "unknown error")
+            module?.log(Log.ERROR, TAG, "${target.name} failed: ${e.message}")
+            return CallResult(emptyMap(), 0, false)
         } finally {
             connection?.disconnect()
         }
     }
 
-    private fun buildPrompt(targetLang: String): String {
-        val customPrompt = ConfigManager.getAiPrompt()
-        if (customPrompt.isNotBlank()) return customPrompt
+    private fun buildPrompt(targetLang: String, scene: String): String {
+        val custom = ConfigManager.getAiPrompt().trim()
+        val base = if (custom.isNotBlank()) custom else """
+你是一个专业翻译引擎。请把待译文本翻译为$targetLang。
+结合同一批文本和相邻片段理解语境，不要逐字硬译。
+        """.trimIndent()
+        val sceneNote = if (scene == "ui") {
+            "这批是同一屏幕上的界面文字（按钮、标签、菜单）。译文要短，语气跟控件一致。相邻条目用来消歧，例如 Post 是动词还是名词。"
+        } else {
+            "这批是正文。role=title 是标题，list 要保留列表符号，quote 要保留引用符，code 只翻译注释和字符串里的自然语言，代码本身原样返回。part 表示同一篇被切开的第几段。"
+        }
         return """
-你是一个专业翻译引擎。请将用户提供的文本翻译为$targetLang。
+$base
 
-规则：
-1. 自动识别每条文本的源语言
-2. 结合整批文本的上下文理解语境，确保翻译准确自然
-3. 不要逐字翻译，要理解完整语义后再翻译
-4. 保持原文的格式
-5. 如果文本已经是$targetLang，原样返回
-6. 专有名词、品牌名、代码、URL保持不变
-7. 只返回 JSON 数组
+场景：$sceneNote
+目标语言：$targetLang
 
-输出格式： [{"id":0,"translation":"译文","lang":"源语言代码"}]
+输出合同（必须遵守）：
+- 只翻译 items[].text。before 和 after 只是相邻原文，禁止写进 translation
+- 返回 JSON 数组，每条对应一个 id，不能合并，不能遗漏
+- 每项格式 {"id":0,"translation":"译文","lang":"源语言代码"}
+- 保持原文的换行、空格、列表和代码围栏
+- URL、代码、专有名词、品牌名保持不变
+- 如果 text 已经是$targetLang，translation 原样返回
+- 不要输出合同之外的说明
         """.trimIndent()
     }
 
-    private fun buildUserContent(texts: List<String>): String {
+    private fun buildUserContent(scene: String, packageName: String, items: List<TranslateItem>): String {
+        val root = JSONObject()
+        root.put("scene", scene)
+        root.put("app", packageName)
+        root.put("target", ConfigManager.getTargetLang())
         val arr = JSONArray()
-        for ((index, text) in texts.withIndex()) {
+        items.forEachIndexed { index, item ->
             val obj = JSONObject()
             obj.put("id", index)
-            obj.put("text", text)
+            obj.put("role", item.role)
+            if (item.parts > 1) obj.put("part", "${item.part}/${item.parts}")
+            if (item.before.isNotBlank()) obj.put("before", item.before)
+            obj.put("text", item.text)
+            if (item.after.isNotBlank()) obj.put("after", item.after)
             arr.put(obj)
         }
-        return arr.toString()
+        root.put("items", arr)
+        return root.toString()
     }
 
     private fun buildRequestBody(
@@ -135,10 +234,8 @@ object TranslationEngine {
         val obj = JSONObject()
         obj.put("model", model)
         val messages = JSONArray()
-        val sysMsg = JSONObject().apply { put("role", "system"); put("content", systemPrompt) }
-        messages.put(sysMsg)
-        val userMsg = JSONObject().apply { put("role", "user"); put("content", userContent) }
-        messages.put(userMsg)
+        messages.put(JSONObject().apply { put("role", "system"); put("content", systemPrompt) })
+        messages.put(JSONObject().apply { put("role", "user"); put("content", userContent) })
         obj.put("messages", messages)
         obj.put("temperature", temperature)
         obj.put("max_tokens", maxTokens)
@@ -146,36 +243,110 @@ object TranslationEngine {
     }
 
     private fun parseResponse(responseBody: String, originals: List<String>): Map<String, TranslationEntry> {
-        val result = mutableMapOf<String, TranslationEntry>()
+        val result = linkedMapOf<String, TranslationEntry>()
         try {
             val root = JSONObject(responseBody)
-            val choices = root.optJSONArray("choices") ?: return result
-            if (choices.length() == 0) return result
-            val message = choices.getJSONObject(0).optJSONObject("message") ?: return result
-            val content = message.optString("content", "").replace("```json", "").replace("```", "").trim()
+            val message = root.optJSONArray("choices")
+                ?.optJSONObject(0)
+                ?.optJSONObject("message")
+                ?: return result
+            val content = messageContent(message)
             if (content.isBlank()) return result
-
-            val arr = JSONArray(content)
+            val arr = extractArray(content)
+            if (arr == null) {
+                if (originals.size == 1) {
+                    val plain = content.replace("```json", "").replace("```", "").trim()
+                    if (plain.isNotEmpty() && !plain.startsWith("{") && !plain.startsWith("[")) {
+                        result[originals[0]] = TranslationEntry(originals[0], plain, "auto")
+                    }
+                }
+                return result
+            }
+            val byId = mutableMapOf<Int, TranslationEntry>()
             for (i in 0 until arr.length()) {
-                val item = arr.getJSONObject(i)
+                val item = arr.optJSONObject(i) ?: continue
                 val id = item.optInt("id", -1)
-                val translation = item.optString("translation", "")
+                val translation = item.optString("translation", "").ifBlank { item.optString("translated", "") }
                 val lang = item.optString("lang", "unknown")
                 if (id in originals.indices && translation.isNotEmpty()) {
-                    result[originals[id]] = TranslationEntry(originals[id], translation, lang)
+                    byId[id] = TranslationEntry(originals[id], translation, lang)
                 }
             }
-        } catch (e: Exception) {
-            if (originals.size == 1) {
-                try {
-                    val content = JSONObject(responseBody)
-                        .getJSONArray("choices").getJSONObject(0)
-                        .getJSONObject("message").getString("content").trim()
-                    if (content.isNotEmpty()) result[originals[0]] = TranslationEntry(originals[0], content, "auto")
-                } catch (_: Exception) {}
+            if (byId.isEmpty() && arr.length() == originals.size) {
+                val ids = (0 until arr.length()).map { arr.optJSONObject(it)?.optInt("id", -1) ?: -1 }
+                val oneBased = ids.all { it in 1..originals.size } && ids.toSet().size == originals.size
+                for (i in 0 until arr.length()) {
+                    val item = arr.optJSONObject(i) ?: continue
+                    val translation = item.optString("translation", "").ifBlank { item.optString("translated", "") }
+                    if (translation.isEmpty()) continue
+                    val rawId = item.optInt("id", if (oneBased) i + 1 else i)
+                    val index = if (oneBased) rawId - 1 else rawId
+                    if (index in originals.indices) {
+                        byId[index] = TranslationEntry(originals[index], translation, item.optString("lang", "unknown"))
+                    }
+                }
             }
+            if (byId.size < originals.size && arr.length() == originals.size) {
+                for (i in 0 until arr.length()) {
+                    if (i in byId) continue
+                    val item = arr.optJSONObject(i) ?: continue
+                    val translation = item.optString("translation", "").ifBlank { item.optString("translated", "") }
+                    if (translation.isNotEmpty()) {
+                        byId[i] = TranslationEntry(originals[i], translation, item.optString("lang", "unknown"))
+                    }
+                }
+            }
+            for ((id, entry) in byId) result[originals[id]] = entry
+        } catch (_: Exception) {
         }
         return result
+    }
+
+    private fun messageContent(message: JSONObject): String {
+        val raw = message.opt("content")
+        return when (raw) {
+            is String -> raw
+            is JSONArray -> buildString {
+                for (i in 0 until raw.length()) {
+                    val part = raw.optJSONObject(i)
+                    append(part?.optString("text").orEmpty().ifBlank { raw.optString(i) })
+                }
+            }
+            else -> message.optString("content", "")
+        }
+    }
+
+    private fun extractArray(content: String): JSONArray? {
+        val cleaned = content.replace("```json", "").replace("```", "").trim()
+        val start = cleaned.indexOf('[')
+        if (start < 0) return null
+        var depth = 0
+        var inString = false
+        var escaped = false
+        for (i in start until cleaned.length) {
+            val c = cleaned[i]
+            if (inString) {
+                if (escaped) escaped = false
+                else if (c == '\\') escaped = true
+                else if (c == '"') inString = false
+                continue
+            }
+            when (c) {
+                '"' -> inString = true
+                '[' -> depth++
+                ']' -> {
+                    depth--
+                    if (depth == 0) {
+                        return try {
+                            JSONArray(cleaned.substring(start, i + 1))
+                        } catch (_: Exception) {
+                            null
+                        }
+                    }
+                }
+            }
+        }
+        return null
     }
 
     /** 发送广播通知配置 App 累计 token 消耗和缓存条数。 */

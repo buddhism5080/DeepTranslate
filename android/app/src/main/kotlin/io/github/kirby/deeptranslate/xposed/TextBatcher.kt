@@ -26,7 +26,16 @@ class TextBatcher(
         val onResult: (String) -> Unit,
     )
 
-    private class Work(val text: String, val job: Job, val index: Int)
+    private class Work(
+        val text: String,
+        val job: Job,
+        val index: Int,
+        val role: String,
+        val part: Int,
+        val parts: Int,
+        val before: String,
+        val after: String,
+    )
 
     private val uiQueue = ConcurrentLinkedQueue<Work>()
     private val contentQueue = ConcurrentLinkedQueue<Work>()
@@ -51,29 +60,54 @@ class TextBatcher(
             }
         }
 
-        val chunks = if (kind == TextKind.UI) {
-            listOf(text)
+        val detailed = if (kind == TextKind.UI) {
+            listOf(TextChunks.Piece(text, "ui"))
         } else {
-            TextChunks.split(text, ConfigManager.getMaxChars(), ConfigManager.getMaxParagraphs())
+            TextChunks.splitDetailed(text, ConfigManager.getMaxChars(), ConfigManager.getMaxParagraphs())
         }
+        val chunks = detailed.map { it.text }
         val hits = if (ConfigManager.isCacheEnabled()) chunks.map { TranslationCache.get(it) } else chunks.map { null }
-        if (hits.all { it != null }) {
-            val joined = hits.joinToString("") { it!! }
-            if (ConfigManager.isCacheEnabled()) TranslationCache.put(text, joined, "cache", packageName)
-            deliver(text, joined, kind, onResult)
-            return
-        }
-
         val refs = AtomicReferenceArray<String>(chunks.size)
         val missing = mutableListOf<Int>()
         for (i in chunks.indices) {
             val hit = hits[i]
-            if (hit != null) refs.set(i, hit) else missing.add(i)
+            when {
+                chunks[i].isBlank() -> refs.set(i, chunks[i])
+                hit != null -> refs.set(i, hit)
+                else -> missing.add(i)
+            }
         }
+        if (missing.isEmpty()) {
+            val joined = buildString { for (i in chunks.indices) append(refs.get(i) ?: chunks[i]) }
+            if (ConfigManager.isCacheEnabled() && joined != text) {
+                TranslationCache.put(text, joined, "cache", packageName)
+            }
+            deliver(text, joined, kind, onResult)
+            return
+        }
+
         val job = Job(text, kind, chunks, refs, AtomicInteger(missing.size), onResult)
         val queue = if (kind == TextKind.UI) uiQueue else contentQueue
-        for (i in missing) queue.add(Work(chunks[i], job, i))
+        for (i in missing) {
+            queue.add(Work(
+                text = chunks[i],
+                job = job,
+                index = i,
+                role = if (kind == TextKind.UI) "ui" else detailed[i].role,
+                part = i + 1,
+                parts = chunks.size,
+                before = neighbor(chunks, i, -1),
+                after = neighbor(chunks, i, 1),
+            ))
+        }
         if (hasFullBatch()) flush(partial = false) else scheduleWindow()
+    }
+
+    private fun neighbor(chunks: List<String>, index: Int, step: Int): String {
+        var i = index + step
+        while (i in chunks.indices && chunks[i].isBlank()) i += step
+        if (i !in chunks.indices) return ""
+        return if (step < 0) TextChunks.contextTail(chunks[i]) else TextChunks.contextHead(chunks[i])
     }
 
     @Synchronized
@@ -143,11 +177,24 @@ class TextBatcher(
             if (hit != null) complete(work, hit, "cache") else pending.add(work)
         }
         if (pending.isEmpty()) return
-        val texts = pending.map { it.text }.distinct()
         val result = TranslationEngine.translateBatch(
-            TranslationEngine.BatchRequest(texts, packageName), module
+            TranslationEngine.BatchRequest(
+                packageName = packageName,
+                scene = if (pending.first().role == "ui") "ui" else "content",
+                items = pending.distinctBy { it.text }.map {
+                    TranslationEngine.TranslateItem(
+                        text = it.text,
+                        role = it.role,
+                        part = it.part,
+                        parts = it.parts,
+                        before = it.before,
+                        after = it.after,
+                    )
+                },
+            ),
+            module,
         )
-        val byText = if (result.success) result.translations else emptyMap()
+        val byText = result.translations
         for (work in pending) {
             val entry = byText[work.text]
             if (entry != null && entry.translated.isNotEmpty()) {

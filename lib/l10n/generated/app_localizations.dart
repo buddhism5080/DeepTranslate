@@ -723,7 +723,20 @@ abstract class AppLocalizations {
   String get bilingual;
 
   String get bilingualDesc;
+
+  String get fallbackTitle;
+
+  String get fallbackHint;
+
+  String get fallbackUrl;
+
+  String get fallbackModel;
+
+  String get retryCount;
+
+  String get retryCountDesc;
 }
+
 
 class _AppLocalizationsDelegate
     extends LocalizationsDelegate<AppLocalizations> {

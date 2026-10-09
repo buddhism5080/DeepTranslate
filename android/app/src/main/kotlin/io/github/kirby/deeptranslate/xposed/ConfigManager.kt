@@ -110,6 +110,10 @@ object ConfigManager {
     fun getConcurrency(): Int = getInt("pref_concurrency", 3).coerceIn(1, 8)
     fun getMaxParagraphs(): Int = getInt("pref_max_paragraphs", 6).coerceIn(1, 30)
     fun getMaxChars(): Int = getInt("pref_max_chars", 1800).coerceIn(200, 20000)
+    fun getRetryCount(): Int = getInt("pref_retry_count", 1).coerceIn(0, 3)
+    fun getFallbackUrl(): String = getString("pref_fallback_url", "")
+    fun getFallbackApiKey(): String = getString("pref_fallback_api_key", "")
+    fun getFallbackModel(): String = getString("pref_fallback_model", "")
     fun isBilingual(): Boolean = getBoolean("pref_bilingual", false)
     fun isCacheEnabled(): Boolean = getBoolean("pref_cache_enabled", true)
     fun isTranslateToast(): Boolean = getBoolean("pref_translate_toast", true)
@@ -158,6 +162,7 @@ object ConfigManager {
         "pref_ai_timeout", "pref_ai_temperature", "pref_ai_max_tokens",
         "pref_batch_size", "pref_batch_window_ms", "pref_cache_enabled",
         "pref_concurrency", "pref_max_paragraphs", "pref_max_chars", "pref_bilingual",
+        "pref_retry_count", "pref_fallback_url", "pref_fallback_api_key", "pref_fallback_model",
         "pref_translate_toast", "pref_app_whitelist",
         "pref_hook_layout", "pref_hook_webview", "pref_hook_compose",
         "pref_theme_mode", "pref_theme_seed_color", "pref_blur_bars",

@@ -130,38 +130,43 @@ object WebViewHook : BaseHook() {
         @JavascriptInterface
         fun offer(payload: String) {
             if (!ConfigManager.isTranslationEnabled() || !ConfigManager.isHookWebView()) return
-            if (payload.length > 100_000) return
             val texts = try {
                 val arr = JSONArray(payload)
                 val collected = mutableListOf<String>()
                 for (i in 0 until arr.length()) {
-                    if (collected.size >= 30) break
+                    if (collected.size >= 40) break
                     val text = arr.optString(i, "")
-                    if (TextGate.shouldTranslate(text)) collected.add(text)
+                    if (text.isNotBlank()) collected.add(text)
                 }
                 collected
             } catch (_: Throwable) {
                 return
             }
             if (texts.isEmpty()) return
-            val pending = AtomicInteger(texts.size)
+            val todo = texts.filter { TextGate.shouldTranslate(it) }
+            if (todo.isEmpty()) {
+                finish(emptyMap(), texts)
+                return
+            }
+            val pending = AtomicInteger(todo.size)
             val translated = ConcurrentHashMap<String, String>()
-            for (text in texts) {
+            for (text in todo) {
                 batcher.submit(text, TextKinds.of(text)) { result ->
                     if (result != text) translated[text] = result
-                    if (pending.decrementAndGet() == 0 && translated.isNotEmpty()) {
-                        apply(translated)
-                    }
+                    if (pending.decrementAndGet() == 0) finish(translated, texts)
                 }
             }
         }
 
-        private fun apply(map: Map<String, String>) {
+        private fun finish(ok: Map<String, String>, settle: List<String>) {
             val view = viewRef.get() ?: return
-            val encoded = JSONObject.quote(JSONObject(map).toString())
+            val payload = JSONObject()
+            payload.put("ok", JSONObject(ok))
+            payload.put("settle", JSONArray(settle))
+            val encoded = JSONObject.quote(payload.toString())
             view.post {
                 try {
-                    view.evaluateJavascript("window.__dtApply && window.__dtApply($encoded)", null)
+                    view.evaluateJavascript("window.__dtFinish && window.__dtFinish($encoded)", null)
                 } catch (_: Throwable) {
                 }
             }
@@ -186,27 +191,36 @@ object WebViewHook : BaseHook() {
               var batch = [];
               var n;
               while ((n = walker.nextNode())) {
-                if (n.__dtLock) continue;
+                if (n.__dtLock || n.__dtPending) continue;
                 if (skip(n.parentElement)) continue;
                 var raw = n.nodeValue;
                 if (!raw || raw.trim().length < 2) continue;
-                n.__dtLock = true;
+                n.__dtPending = true;
                 batch.push(raw);
-                if (batch.length >= 30) break;
+                if (batch.length >= 40) break;
               }
               if (batch.length) window.DeepTranslate.offer(JSON.stringify(batch));
             }
-            window.__dtApply = function(encoded){
-              var map;
-              try { map = JSON.parse(encoded); } catch (e) { return; }
+            window.__dtFinish = function(encoded){
+              var msg;
+              try { msg = JSON.parse(encoded); } catch (e) { collect(); return; }
+              var ok = msg.ok || {};
+              var settle = msg.settle || [];
+              var settleSet = {};
+              for (var i = 0; i < settle.length; i++) settleSet[settle[i]] = true;
               if (!document.body) return;
               var walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null);
               var n;
               while ((n = walker.nextNode())) {
                 var v = n.nodeValue;
-                if (v && Object.prototype.hasOwnProperty.call(map, v)) {
-                  n.nodeValue = map[v];
+                if (!v) continue;
+                if (Object.prototype.hasOwnProperty.call(ok, v)) {
+                  n.nodeValue = ok[v];
                   n.__dtLock = true;
+                  n.__dtPending = false;
+                } else if (settleSet[v]) {
+                  n.__dtLock = true;
+                  n.__dtPending = false;
                 }
               }
               collect();

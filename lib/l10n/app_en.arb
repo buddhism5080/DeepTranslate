@@ -121,5 +121,11 @@
   "maxChars": "Max characters",
   "maxCharsDesc": "Longer text is split at paragraphs or sentences into more requests",
   "bilingual": "Bilingual display",
-  "bilingualDesc": "Show the translation and the original together"
+  "bilingualDesc": "Show the translation and the original together",
+  "fallbackTitle": "Fallback channel",
+  "fallbackHint": "Used after the main channel retries and still fails. Leave the URL or model empty to disable it.",
+  "fallbackUrl": "Fallback API URL",
+  "fallbackModel": "Fallback model",
+  "retryCount": "Retries",
+  "retryCountDesc": "Extra tries on the current channel before switching. 0 switches on the first error."
 }

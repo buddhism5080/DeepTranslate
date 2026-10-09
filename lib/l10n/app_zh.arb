@@ -121,5 +121,11 @@
   "maxChars": "最多字符",
   "maxCharsDesc": "超过后按段落或句子切开，分成多次请求",
   "bilingual": "双语显示",
-  "bilingualDesc": "译文和原文一起显示"
+  "bilingualDesc": "译文和原文一起显示",
+  "fallbackTitle": "回退渠道",
+  "fallbackHint": "主渠道重试后仍失败就改用这里。URL 或模型留空则不回退。",
+  "fallbackUrl": "回退 API URL",
+  "fallbackModel": "回退模型",
+  "retryCount": "失败重试",
+  "retryCountDesc": "当前渠道出错后再试几次，然后才换回退。0 表示一失败就换。"
 }

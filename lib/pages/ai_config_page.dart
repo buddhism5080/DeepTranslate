@@ -24,8 +24,12 @@ class _AiConfigPageState extends State<AiConfigPage> {
   late final TextEditingController _keyCtrl;
   late final TextEditingController _modelCtrl;
   late final TextEditingController _promptCtrl;
+  late final TextEditingController _fbUrlCtrl;
+  late final TextEditingController _fbKeyCtrl;
+  late final TextEditingController _fbModelCtrl;
 
   bool _keyObscured = true;
+  bool _fbKeyObscured = true;
   bool _testing = false;
   bool _fetchingModels = false;
   List<String> _availableModels = [];
@@ -40,6 +44,7 @@ class _AiConfigPageState extends State<AiConfigPage> {
   late int _concurrencyDraft;
   late int _maxParagraphsDraft;
   late int _maxCharsDraft;
+  late int _retryDraft;
 
   @override
   void initState() {
@@ -49,6 +54,9 @@ class _AiConfigPageState extends State<AiConfigPage> {
     _keyCtrl = TextEditingController(text: _ctrl.aiApiKey);
     _modelCtrl = TextEditingController(text: _ctrl.aiModel);
     _promptCtrl = TextEditingController(text: _ctrl.aiPrompt);
+    _fbUrlCtrl = TextEditingController(text: _ctrl.fallbackUrl);
+    _fbKeyCtrl = TextEditingController(text: _ctrl.fallbackApiKey);
+    _fbModelCtrl = TextEditingController(text: _ctrl.fallbackModel);
     _aiTimeoutDraft = _ctrl.aiTimeout;
     _aiTemperatureDraft = _ctrl.aiTemperature;
     _aiMaxTokensDraft = _ctrl.aiMaxTokens;
@@ -57,6 +65,7 @@ class _AiConfigPageState extends State<AiConfigPage> {
     _concurrencyDraft = _ctrl.concurrency;
     _maxParagraphsDraft = _ctrl.maxParagraphs;
     _maxCharsDraft = _ctrl.maxChars;
+    _retryDraft = _ctrl.retryCount;
   }
 
   void _onCtrlChanged() {
@@ -75,6 +84,9 @@ class _AiConfigPageState extends State<AiConfigPage> {
     _keyCtrl.dispose();
     _modelCtrl.dispose();
     _promptCtrl.dispose();
+    _fbUrlCtrl.dispose();
+    _fbKeyCtrl.dispose();
+    _fbModelCtrl.dispose();
     super.dispose();
   }
 
@@ -149,6 +161,10 @@ class _AiConfigPageState extends State<AiConfigPage> {
     await _ctrl.setConcurrency(_concurrencyDraft);
     await _ctrl.setMaxParagraphs(_maxParagraphsDraft);
     await _ctrl.setMaxChars(_maxCharsDraft);
+    await _ctrl.setRetryCount(_retryDraft);
+    await _ctrl.setFallbackUrl(_fbUrlCtrl.text.trim());
+    await _ctrl.setFallbackApiKey(_fbKeyCtrl.text.trim());
+    await _ctrl.setFallbackModel(_fbModelCtrl.text.trim());
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -505,6 +521,66 @@ class _AiConfigPageState extends State<AiConfigPage> {
                             label: Text(l10n.save),
                             style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12)),
                           ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                SectionLabel(l10n.fallbackTitle),
+                const SizedBox(height: 8),
+                Card(
+                  elevation: 0,
+                  color: cs.surfaceContainerHighest,
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          l10n.fallbackHint,
+                          style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                        ),
+                        const SizedBox(height: 12),
+                        _buildTextField(
+                          controller: _fbUrlCtrl,
+                          label: l10n.fallbackUrl,
+                          hint: l10n.apiUrlHint,
+                          icon: FontAwesomeIcons.link,
+                        ),
+                        const SizedBox(height: 16),
+                        _buildTextField(
+                          controller: _fbKeyCtrl,
+                          label: l10n.apiKey,
+                          hint: l10n.apiKeyHint,
+                          icon: FontAwesomeIcons.key,
+                          obscure: _fbKeyObscured,
+                          suffix: IconButton(
+                            icon: FaIcon(
+                              _fbKeyObscured ? FontAwesomeIcons.eyeSlash : FontAwesomeIcons.eye,
+                              size: 16,
+                            ),
+                            onPressed: () => setState(() => _fbKeyObscured = !_fbKeyObscured),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        _buildTextField(
+                          controller: _fbModelCtrl,
+                          label: l10n.fallbackModel,
+                          hint: l10n.modelHint,
+                          icon: FontAwesomeIcons.cube,
+                        ),
+                        _limitSlider(
+                          icon: const Icon(Icons.replay, size: 18),
+                          title: l10n.retryCount,
+                          subtitle: l10n.retryCountDesc,
+                          valueLabel: '$_retryDraft',
+                          value: _retryDraft.toDouble(),
+                          min: 0,
+                          max: 3,
+                          divisions: 3,
+                          onChanged: (v) => setState(() => _retryDraft = v.round()),
                         ),
                       ],
                     ),

@@ -24,6 +24,7 @@
 - **Contextual batching** -- Short UI text is sent whole, together. Posts are split by paragraph and length
 - **SQLite cache** -- The translation is stored for the source text, so the same text is not requested again. Bilingual display is applied on screen and is not cached separately
 - **Bilingual display** -- Optional. Short controls show "translation (original)". Posts show the translation, a blank line, then the original
+- **Fallback channel** -- After 0–3 retries, a second API is used. Missing lines are retried on their own instead of dropping the batch
 - **Span preservation** -- The `TextView.setText` path keeps color, weight, size, and alignment
 - **Material 3 UI** -- Layout text, WebView, and Compose can be toggled separately
 

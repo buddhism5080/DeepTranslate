@@ -18,6 +18,10 @@ const kPrefConcurrency = 'pref_concurrency';
 const kPrefMaxParagraphs = 'pref_max_paragraphs';
 const kPrefMaxChars = 'pref_max_chars';
 const kPrefBilingual = 'pref_bilingual';
+const kPrefRetryCount = 'pref_retry_count';
+const kPrefFallbackUrl = 'pref_fallback_url';
+const kPrefFallbackApiKey = 'pref_fallback_api_key';
+const kPrefFallbackModel = 'pref_fallback_model';
 const kPrefCacheEnabled = 'pref_cache_enabled';
 const kPrefTranslateToast = 'pref_translate_toast';
 const kPrefHookLayout = 'pref_hook_layout';
@@ -74,6 +78,10 @@ class SettingsController extends ChangeNotifier {
   int maxParagraphs = 6;
   int maxChars = 1800;
   bool bilingual = false;
+  int retryCount = 1;
+  String fallbackUrl = '';
+  String fallbackApiKey = '';
+  String fallbackModel = '';
   bool cacheEnabled = true;
   bool translateToast = true;
   bool hookLayout = true;
@@ -113,6 +121,10 @@ class SettingsController extends ChangeNotifier {
     maxParagraphs = prefs.getInt(kPrefMaxParagraphs) ?? 6;
     maxChars = prefs.getInt(kPrefMaxChars) ?? 1800;
     bilingual = prefs.getBool(kPrefBilingual) ?? false;
+    retryCount = prefs.getInt(kPrefRetryCount) ?? 1;
+    fallbackUrl = prefs.getString(kPrefFallbackUrl) ?? '';
+    fallbackApiKey = prefs.getString(kPrefFallbackApiKey) ?? '';
+    fallbackModel = prefs.getString(kPrefFallbackModel) ?? '';
     cacheEnabled = prefs.getBool(kPrefCacheEnabled) ?? true;
     translateToast = prefs.getBool(kPrefTranslateToast) ?? true;
     hookLayout = prefs.getBool(kPrefHookLayout) ?? true;
@@ -249,6 +261,38 @@ class SettingsController extends ChangeNotifier {
     bilingual = value;
     final prefs = await _getPrefs();
     await prefs.setBool(kPrefBilingual, value);
+    notifyListeners();
+  }
+
+  Future<void> setRetryCount(int value) async {
+    if (retryCount == value) return;
+    retryCount = value;
+    final prefs = await _getPrefs();
+    await prefs.setInt(kPrefRetryCount, value);
+    notifyListeners();
+  }
+
+  Future<void> setFallbackUrl(String value) async {
+    if (fallbackUrl == value) return;
+    fallbackUrl = value;
+    final prefs = await _getPrefs();
+    await prefs.setString(kPrefFallbackUrl, value);
+    notifyListeners();
+  }
+
+  Future<void> setFallbackApiKey(String value) async {
+    if (fallbackApiKey == value) return;
+    fallbackApiKey = value;
+    final prefs = await _getPrefs();
+    await prefs.setString(kPrefFallbackApiKey, value);
+    notifyListeners();
+  }
+
+  Future<void> setFallbackModel(String value) async {
+    if (fallbackModel == value) return;
+    fallbackModel = value;
+    final prefs = await _getPrefs();
+    await prefs.setString(kPrefFallbackModel, value);
     notifyListeners();
   }
 

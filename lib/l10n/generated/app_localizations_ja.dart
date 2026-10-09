@@ -360,6 +360,23 @@ class AppLocalizationsJa extends AppLocalizations {
   @override
   String get bilingualDesc => 'Show the translation and the original together';
   @override
+  String get fallbackTitle => 'Fallback channel';
+
+  @override
+  String get fallbackHint => 'Used after the main channel retries and still fails. Leave the URL or model empty to disable it.';
+
+  @override
+  String get fallbackUrl => 'Fallback API URL';
+
+  @override
+  String get fallbackModel => 'Fallback model';
+
+  @override
+  String get retryCount => 'Retries';
+
+  @override
+  String get retryCountDesc => 'Extra tries on the current channel before switching. 0 switches on the first error.';
+  @override
   String modelsFetched(Object count) {
     return 'Fetched $count models';
   }

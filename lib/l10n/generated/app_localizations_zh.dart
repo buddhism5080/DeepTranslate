@@ -360,6 +360,23 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get bilingualDesc => '译文和原文一起显示';
   @override
+  String get fallbackTitle => '回退渠道';
+
+  @override
+  String get fallbackHint => '主渠道重试后仍失败就改用这里。URL 或模型留空则不回退。';
+
+  @override
+  String get fallbackUrl => '回退 API URL';
+
+  @override
+  String get fallbackModel => '回退模型';
+
+  @override
+  String get retryCount => '失败重试';
+
+  @override
+  String get retryCountDesc => '当前渠道出错后再试几次，然后才换回退。0 表示一失败就换。';
+  @override
   String modelsFetched(Object count) {
     return '已拉取 $count 个模型';
   }
