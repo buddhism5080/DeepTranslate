@@ -37,6 +37,9 @@ class _AiConfigPageState extends State<AiConfigPage> {
   late int _aiMaxTokensDraft;
   late int _batchSizeDraft;
   late int _batchWindowDraft;
+  late int _concurrencyDraft;
+  late int _maxParagraphsDraft;
+  late int _maxCharsDraft;
 
   @override
   void initState() {
@@ -51,6 +54,9 @@ class _AiConfigPageState extends State<AiConfigPage> {
     _aiMaxTokensDraft = _ctrl.aiMaxTokens;
     _batchSizeDraft = _ctrl.batchSize;
     _batchWindowDraft = _ctrl.batchWindowMs;
+    _concurrencyDraft = _ctrl.concurrency;
+    _maxParagraphsDraft = _ctrl.maxParagraphs;
+    _maxCharsDraft = _ctrl.maxChars;
   }
 
   void _onCtrlChanged() {
@@ -72,6 +78,62 @@ class _AiConfigPageState extends State<AiConfigPage> {
     super.dispose();
   }
 
+  Widget _limitSlider({
+    required Widget icon,
+    required String title,
+    required String subtitle,
+    required String valueLabel,
+    required double value,
+    required double min,
+    required double max,
+    required int divisions,
+    required ValueChanged<double> onChanged,
+  }) {
+    final textTheme = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
+    return Column(
+      children: [
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            icon,
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: textTheme.titleMedium),
+                  Text(
+                    subtitle,
+                    style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                  ),
+                ],
+              ),
+            ),
+            Text(
+              valueLabel,
+              style: textTheme.bodyLarge?.copyWith(
+                color: cs.primary,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+        SliderTheme(
+          data: ModernSliderTheme.theme(context),
+          child: Slider(
+            value: value,
+            min: min,
+            max: max,
+            divisions: divisions,
+            label: valueLabel,
+            onChanged: onChanged,
+          ),
+        ),
+      ],
+    );
+  }
+
   Future<void> _save() async {
     final l10n = AppLocalizations.of(context)!;
 
@@ -84,6 +146,9 @@ class _AiConfigPageState extends State<AiConfigPage> {
     await _ctrl.setAiMaxTokens(_aiMaxTokensDraft);
     await _ctrl.setBatchSize(_batchSizeDraft);
     await _ctrl.setBatchWindowMs(_batchWindowDraft);
+    await _ctrl.setConcurrency(_concurrencyDraft);
+    await _ctrl.setMaxParagraphs(_maxParagraphsDraft);
+    await _ctrl.setMaxChars(_maxCharsDraft);
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -538,6 +603,39 @@ class _AiConfigPageState extends State<AiConfigPage> {
                               () => _batchWindowDraft = v.round(),
                             ),
                           ),
+                        ),
+                        _limitSlider(
+                          icon: const Icon(Icons.speed, size: 18),
+                          title: l10n.concurrency,
+                          subtitle: l10n.concurrencyDesc,
+                          valueLabel: '$_concurrencyDraft',
+                          value: _concurrencyDraft.toDouble(),
+                          min: 1,
+                          max: 8,
+                          divisions: 7,
+                          onChanged: (v) => setState(() => _concurrencyDraft = v.round()),
+                        ),
+                        _limitSlider(
+                          icon: const Icon(Icons.segment, size: 18),
+                          title: l10n.maxParagraphs,
+                          subtitle: l10n.maxParagraphsDesc,
+                          valueLabel: '$_maxParagraphsDraft',
+                          value: _maxParagraphsDraft.toDouble(),
+                          min: 1,
+                          max: 16,
+                          divisions: 15,
+                          onChanged: (v) => setState(() => _maxParagraphsDraft = v.round()),
+                        ),
+                        _limitSlider(
+                          icon: const Icon(Icons.short_text, size: 18),
+                          title: l10n.maxChars,
+                          subtitle: l10n.maxCharsDesc,
+                          valueLabel: '$_maxCharsDraft',
+                          value: _maxCharsDraft.toDouble(),
+                          min: 400,
+                          max: 8000,
+                          divisions: 38,
+                          onChanged: (v) => setState(() => _maxCharsDraft = (v / 200).round() * 200),
                         ),
                         const SizedBox(height: 8),
                         SwitchListTile(

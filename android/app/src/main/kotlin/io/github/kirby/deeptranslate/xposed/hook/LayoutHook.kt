@@ -1,8 +1,10 @@
 package io.github.kirby.deeptranslate.xposed.hook
 
 import io.github.kirby.deeptranslate.xposed.ConfigManager
+import io.github.kirby.deeptranslate.xposed.DisplayText
 import io.github.kirby.deeptranslate.xposed.TextBatcher
 import io.github.kirby.deeptranslate.xposed.TextGate
+import io.github.kirby.deeptranslate.xposed.TextKinds
 import io.github.kirby.deeptranslate.xposed.TranslationCache
 import io.github.kirby.deeptranslate.xposed.TranslationSession
 import io.github.kirby.deeptranslate.xposed.WindowRefresher
@@ -103,18 +105,22 @@ object LayoutHook : BaseHook() {
             if (!TextGate.shouldTranslate(slice)) return@intercept chain.proceed()
 
             TranslationCache.ensureFromApp()
+            val kind = TextKinds.of(slice)
             val cached = if (ConfigManager.isCacheEnabled()) TranslationCache.get(slice) else null
-            if (cached != null && cached != slice) {
+            if (cached != null) {
+                if (cached == slice) return@intercept chain.proceed()
+                val shown = DisplayText.present(slice, cached, kind)
+                DisplayText.remember(shown)
                 val replaced = args.toTypedArray()
-                replaced[0] = cached
+                replaced[0] = shown
                 if (adjustRange) {
                     replaced[1] = 0
-                    replaced[2] = cached.length
+                    replaced[2] = shown.length
                 }
                 return@intercept chain.proceed(replaced)
             }
 
-            batcher.submit(slice) { translated ->
+            batcher.submit(slice, kind) { translated ->
                 if (translated != slice) WindowRefresher.schedule()
             }
             chain.proceed()

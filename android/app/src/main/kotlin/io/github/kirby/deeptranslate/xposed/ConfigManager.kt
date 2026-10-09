@@ -105,8 +105,12 @@ object ConfigManager {
     fun getAiTimeout(): Int = getInt("pref_ai_timeout", 10)
     fun getAiTemperature(): Double = getDouble("pref_ai_temperature", 0.1)
     fun getAiMaxTokens(): Int = getInt("pref_ai_max_tokens", 4096)
-    fun getBatchSize(): Int = getInt("pref_batch_size", 20)
-    fun getBatchWindowMs(): Long = getInt("pref_batch_window_ms", 100).toLong()
+    fun getBatchSize(): Int = getInt("pref_batch_size", 20).coerceIn(1, 50)
+    fun getBatchWindowMs(): Long = getInt("pref_batch_window_ms", 100).toLong().coerceIn(50L, 2000L)
+    fun getConcurrency(): Int = getInt("pref_concurrency", 3).coerceIn(1, 8)
+    fun getMaxParagraphs(): Int = getInt("pref_max_paragraphs", 6).coerceIn(1, 30)
+    fun getMaxChars(): Int = getInt("pref_max_chars", 1800).coerceIn(200, 20000)
+    fun isBilingual(): Boolean = getBoolean("pref_bilingual", false)
     fun isCacheEnabled(): Boolean = getBoolean("pref_cache_enabled", true)
     fun isTranslateToast(): Boolean = getBoolean("pref_translate_toast", true)
     fun getAppWhitelist(): Set<String> {
@@ -153,6 +157,7 @@ object ConfigManager {
         "pref_ai_model", "pref_ai_prompt", "pref_ai_target_lang",
         "pref_ai_timeout", "pref_ai_temperature", "pref_ai_max_tokens",
         "pref_batch_size", "pref_batch_window_ms", "pref_cache_enabled",
+        "pref_concurrency", "pref_max_paragraphs", "pref_max_chars", "pref_bilingual",
         "pref_translate_toast", "pref_app_whitelist",
         "pref_hook_layout", "pref_hook_webview", "pref_hook_compose",
         "pref_theme_mode", "pref_theme_seed_color", "pref_blur_bars",

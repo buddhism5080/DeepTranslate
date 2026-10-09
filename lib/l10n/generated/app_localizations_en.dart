@@ -249,10 +249,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get batchConfig => 'Batch Config';
 
   @override
-  String get batchSize => 'Batch Size';
+  String get batchSize => 'Max widgets per request';
 
   @override
-  String get batchSizeDesc => 'Max texts per API request';
+  String get batchSizeDesc => 'How many controls or chunks share one request. Short UI text stays whole and is grouped together.';
 
   @override
   String get batchWindow => 'Batch Window';
@@ -265,7 +265,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get translationCacheDesc =>
-      'Cache translations locally to avoid repeated API calls';
+      'Saves the translation for each source text, so the same text is not requested again. Bilingual display is added on screen and is not stored separately.';
 
   @override
   String get deepseekInfo => 'Any OpenAI-compatible API. Use a base URL (https://host/v1) or the full /chat/completions URL. Fetch models from /models, or type a model id. API key can be empty for local servers.';
@@ -342,6 +342,29 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get hookComposeDesc => 'Hooks Compose TextLayout / Paragraph when those classes exist';
 
+  @override
+  String get concurrency => 'Concurrency';
+
+  @override
+  String get concurrencyDesc => 'How many translation requests run at once';
+
+  @override
+  String get maxParagraphs => 'Max paragraphs';
+
+  @override
+  String get maxParagraphsDesc => 'Paragraphs from one post kept in a single chunk';
+
+  @override
+  String get maxChars => 'Max characters';
+
+  @override
+  String get maxCharsDesc => 'Longer text is split at paragraphs or sentences into more requests';
+
+  @override
+  String get bilingual => 'Bilingual display';
+
+  @override
+  String get bilingualDesc => 'Show the translation and the original together';
   @override
   String modelsFetched(Object count) {
     return 'Fetched $count models';

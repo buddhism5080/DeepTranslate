@@ -155,6 +155,14 @@ class _SettingsPageState extends State<SettingsPage> {
                       ),
                       const Divider(height: 1, indent: 16, endIndent: 16),
                       SwitchListTile(
+                        secondary: const Icon(Icons.subtitles_outlined),
+                        title: Text(l10n.bilingual),
+                        subtitle: Text(l10n.bilingualDesc),
+                        value: _ctrl.bilingual,
+                        onChanged: (v) => _ctrl.setBilingual(v),
+                      ),
+                      const Divider(height: 1, indent: 16, endIndent: 16),
+                      SwitchListTile(
                         secondary: const Icon(Icons.bug_report),
                         title: Text(l10n.debugLog),
                         subtitle: Text(l10n.debugLogDesc),

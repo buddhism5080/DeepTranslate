@@ -21,8 +21,9 @@
 - **WebView** -- Translates visible page text. Skips inputs, scripts, and styles
 - **Custom OpenAI-compatible API** -- Base URL (`https://host/v1`) or a full `/chat/completions` URL
 - **Custom model** -- Type a model id, or fetch `/models` and pick one. API key can be empty for local servers
-- **Contextual batching** -- One request for the texts collected on a page
-- **SQLite cache** -- Cache hits skip the API. Translations are remembered so a relayout does not translate them again
+- **Contextual batching** -- Short UI text is sent whole, together. Posts are split by paragraph and length
+- **SQLite cache** -- The translation is stored for the source text, so the same text is not requested again. Bilingual display is applied on screen and is not cached separately
+- **Bilingual display** -- Optional. Short controls show "translation (original)". Posts show the translation, a blank line, then the original
 - **Span preservation** -- The `TextView.setText` path keeps color, weight, size, and alignment
 - **Material 3 UI** -- Layout text, WebView, and Compose can be toggled separately
 
@@ -43,7 +44,7 @@
 4. Turn on Global Translation. Layout text, WebView, and Compose can be disabled separately in Settings
 5. Restart target apps, text will translate automatically
 
-> First translation triggers contextual batching (aggregates text within a 100ms window). Results appear shortly.
+> The first pass waits a short collection window. Long posts are split across requests. Concurrency, widgets per request, paragraphs, and characters are in Config.
 
 > **Switching target language**: Modify the target language in "Config -> Translation Prompt". For example, change "翻译为中文" to "translate to Japanese", "translated to Spanish", etc.
 
@@ -75,7 +76,7 @@ Kotlin Hook (android/)     Runs inside target app processes
   +-- TextViewHook          Hooks TextView.setText()
   +-- LayoutHook            StaticLayout / BoringLayout / Compose
   +-- WebViewHook           Visible WebView text
-  +-- TextBatcher           Contextual batching (time window + count limit)
+  +-- TextBatcher           UI text and posts are packed separately; long posts are chunked
   +-- TranslationEngine     OpenAI-compatible chat/completions
   +-- TranslationCache      SQLite persistent cache
   +-- LanguageDetector      Fast language detection (CJK character ratio)

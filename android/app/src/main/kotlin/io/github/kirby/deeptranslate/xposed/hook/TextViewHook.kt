@@ -10,6 +10,7 @@ import android.widget.TextView
 import io.github.kirby.deeptranslate.xposed.ConfigManager
 import io.github.kirby.deeptranslate.xposed.TextBatcher
 import io.github.kirby.deeptranslate.xposed.TextGate
+import io.github.kirby.deeptranslate.xposed.TextKinds
 import io.github.kirby.deeptranslate.xposed.TranslationSession
 import io.github.libxposed.api.XposedModule
 import io.github.libxposed.api.XposedModuleInterface.PackageLoadedParam
@@ -55,7 +56,7 @@ object TextViewHook : BaseHook() {
                     val key = "${textView.hashCode()}_${textStr.hashCode()}"
                     if (pendingTexts.putIfAbsent(key, true) == null) {
                         val tvRef = WeakReference(textView)
-                        batcher?.submit(textStr) { translated ->
+                        batcher?.submit(textStr, TextKinds.of(textStr, textView.javaClass.name, textView.maxLines)) { translated ->
                             val tv = tvRef.get() ?: return@submit
                             try {
                                 if (tv.text?.toString() == textStr) {
@@ -90,7 +91,7 @@ object TextViewHook : BaseHook() {
                     if (pendingTexts.putIfAbsent(key, true) == null) {
                         val tvRef = WeakReference(textView)
                         val bufType = chain.args[1] as TextView.BufferType
-                        batcher?.submit(textStr) { translated ->
+                        batcher?.submit(textStr, TextKinds.of(textStr, textView.javaClass.name, textView.maxLines)) { translated ->
                             val tv = tvRef.get() ?: return@submit
                             try {
                                 if (tv.text?.toString() == textStr) {
@@ -129,7 +130,7 @@ object TextViewHook : BaseHook() {
                         val key = "${textView.hashCode()}_${textStr.hashCode()}"
                         if (pendingTexts.putIfAbsent(key, true) == null) {
                             val tvRef = WeakReference(textView)
-                            batcher?.submit(textStr) { translated ->
+                            batcher?.submit(textStr, TextKinds.of(textStr, textView.javaClass.name, textView.maxLines)) { translated ->
                                 val tv = tvRef.get() ?: return@submit
                                 try {
                                     tv.text = translated
@@ -150,6 +151,7 @@ object TextViewHook : BaseHook() {
 
     /** 翻译后检测文字是否被截断（ellipsize），如果是则还原原文。 */
     private fun checkOverflow(tv: TextView, original: CharSequence?) {
+        if (ConfigManager.isBilingual()) return
         tv.post {
             try {
                 val layout = tv.layout

@@ -14,6 +14,10 @@ const kPrefAiTemperature = 'pref_ai_temperature';
 const kPrefAiMaxTokens = 'pref_ai_max_tokens';
 const kPrefBatchSize = 'pref_batch_size';
 const kPrefBatchWindowMs = 'pref_batch_window_ms';
+const kPrefConcurrency = 'pref_concurrency';
+const kPrefMaxParagraphs = 'pref_max_paragraphs';
+const kPrefMaxChars = 'pref_max_chars';
+const kPrefBilingual = 'pref_bilingual';
 const kPrefCacheEnabled = 'pref_cache_enabled';
 const kPrefTranslateToast = 'pref_translate_toast';
 const kPrefHookLayout = 'pref_hook_layout';
@@ -66,6 +70,10 @@ class SettingsController extends ChangeNotifier {
   int aiMaxTokens = 4096;
   int batchSize = 20;
   int batchWindowMs = 100;
+  int concurrency = 3;
+  int maxParagraphs = 6;
+  int maxChars = 1800;
+  bool bilingual = false;
   bool cacheEnabled = true;
   bool translateToast = true;
   bool hookLayout = true;
@@ -101,6 +109,10 @@ class SettingsController extends ChangeNotifier {
     aiMaxTokens = prefs.getInt(kPrefAiMaxTokens) ?? 4096;
     batchSize = prefs.getInt(kPrefBatchSize) ?? 20;
     batchWindowMs = prefs.getInt(kPrefBatchWindowMs) ?? 100;
+    concurrency = prefs.getInt(kPrefConcurrency) ?? 3;
+    maxParagraphs = prefs.getInt(kPrefMaxParagraphs) ?? 6;
+    maxChars = prefs.getInt(kPrefMaxChars) ?? 1800;
+    bilingual = prefs.getBool(kPrefBilingual) ?? false;
     cacheEnabled = prefs.getBool(kPrefCacheEnabled) ?? true;
     translateToast = prefs.getBool(kPrefTranslateToast) ?? true;
     hookLayout = prefs.getBool(kPrefHookLayout) ?? true;
@@ -205,6 +217,38 @@ class SettingsController extends ChangeNotifier {
     batchWindowMs = value;
     final prefs = await _getPrefs();
     await prefs.setInt(kPrefBatchWindowMs, value);
+    notifyListeners();
+  }
+
+  Future<void> setConcurrency(int value) async {
+    if (concurrency == value) return;
+    concurrency = value;
+    final prefs = await _getPrefs();
+    await prefs.setInt(kPrefConcurrency, value);
+    notifyListeners();
+  }
+
+  Future<void> setMaxParagraphs(int value) async {
+    if (maxParagraphs == value) return;
+    maxParagraphs = value;
+    final prefs = await _getPrefs();
+    await prefs.setInt(kPrefMaxParagraphs, value);
+    notifyListeners();
+  }
+
+  Future<void> setMaxChars(int value) async {
+    if (maxChars == value) return;
+    maxChars = value;
+    final prefs = await _getPrefs();
+    await prefs.setInt(kPrefMaxChars, value);
+    notifyListeners();
+  }
+
+  Future<void> setBilingual(bool value) async {
+    if (bilingual == value) return;
+    bilingual = value;
+    final prefs = await _getPrefs();
+    await prefs.setBool(kPrefBilingual, value);
     notifyListeners();
   }
 

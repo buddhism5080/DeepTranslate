@@ -341,6 +341,29 @@ class AppLocalizationsRu extends AppLocalizations {
   String get hookComposeDesc => 'Hooks Compose TextLayout / Paragraph when those classes exist';
 
   @override
+  String get concurrency => 'Concurrency';
+
+  @override
+  String get concurrencyDesc => 'How many translation requests run at once';
+
+  @override
+  String get maxParagraphs => 'Max paragraphs';
+
+  @override
+  String get maxParagraphsDesc => 'Paragraphs from one post kept in a single chunk';
+
+  @override
+  String get maxChars => 'Max characters';
+
+  @override
+  String get maxCharsDesc => 'Longer text is split at paragraphs or sentences into more requests';
+
+  @override
+  String get bilingual => 'Bilingual display';
+
+  @override
+  String get bilingualDesc => 'Show the translation and the original together';
+  @override
   String modelsFetched(Object count) {
     return 'Fetched $count models';
   }

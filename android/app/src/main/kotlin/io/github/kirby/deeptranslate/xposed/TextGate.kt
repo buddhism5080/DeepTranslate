@@ -6,7 +6,7 @@ object TextGate {
     private val URL = Regex("^https?://\\S+$")
 
     fun shouldTranslate(text: String): Boolean {
-        if (text.isBlank() || text.length < 2 || text.length > 4000) return false
+        if (text.isBlank() || text.length < 2 || text.length > 100_000) return false
         val trimmed = text.trim()
         if (trimmed.length < 2) return false
         if (URL.matches(trimmed)) return false

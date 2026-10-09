@@ -6,6 +6,7 @@ import android.webkit.WebViewClient
 import io.github.kirby.deeptranslate.xposed.ConfigManager
 import io.github.kirby.deeptranslate.xposed.TextBatcher
 import io.github.kirby.deeptranslate.xposed.TextGate
+import io.github.kirby.deeptranslate.xposed.TextKinds
 import io.github.kirby.deeptranslate.xposed.TranslationSession
 import io.github.libxposed.api.XposedModule
 import io.github.libxposed.api.XposedModuleInterface.PackageLoadedParam
@@ -146,7 +147,7 @@ object WebViewHook : BaseHook() {
             val pending = AtomicInteger(texts.size)
             val translated = ConcurrentHashMap<String, String>()
             for (text in texts) {
-                batcher.submit(text) { result ->
+                batcher.submit(text, TextKinds.of(text)) { result ->
                     if (result != text) translated[text] = result
                     if (pending.decrementAndGet() == 0 && translated.isNotEmpty()) {
                         apply(translated)

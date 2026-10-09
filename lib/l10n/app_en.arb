@@ -77,12 +77,12 @@
   "temperatureDesc": "Lower = more deterministic, higher = more creative",
   "maxTokensDesc": "Maximum response length",
   "batchConfig": "Batch Config",
-  "batchSize": "Batch Size",
-  "batchSizeDesc": "Max texts per API request",
+  "batchSize": "Max widgets per request",
+  "batchSizeDesc": "How many controls or chunks share one request. Short UI text stays whole and is grouped together.",
   "batchWindow": "Batch Window",
   "batchWindowDesc": "Time to wait for more text (ms)",
   "translationCache": "Translation Cache",
-  "translationCacheDesc": "Cache translations locally to avoid repeated API calls",
+  "translationCacheDesc": "Saves the translation for each source text, so the same text is not requested again. Bilingual display is added on screen and is not stored separately.",
   "deepseekInfo": "Any OpenAI-compatible API. Use a base URL (https://host/v1) or the full /chat/completions URL. Fetch models from /models, or type a model id. API key can be empty for local servers.",
   "promptHint": "Tap to edit translation prompt...",
   "restoreDefault": "Restore Default",
@@ -113,5 +113,13 @@
         "type": "int"
       }
     }
-  }
+  },
+  "concurrency": "Concurrency",
+  "concurrencyDesc": "How many translation requests run at once",
+  "maxParagraphs": "Max paragraphs",
+  "maxParagraphsDesc": "Paragraphs from one post kept in a single chunk",
+  "maxChars": "Max characters",
+  "maxCharsDesc": "Longer text is split at paragraphs or sentences into more requests",
+  "bilingual": "Bilingual display",
+  "bilingualDesc": "Show the translation and the original together"
 }

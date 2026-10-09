@@ -77,12 +77,12 @@
   "temperatureDesc": "越低越确定，越高越有创造性",
   "maxTokensDesc": "单次响应上限",
   "batchConfig": "批处理配置",
-  "batchSize": "批量大小",
-  "batchSizeDesc": "每次 API 请求的最大文本数",
+  "batchSize": "单次最多控件",
+  "batchSizeDesc": "同一请求里的控件或切块条数。界面短文本整条分组，不切开。",
   "batchWindow": "聚合窗口",
   "batchWindowDesc": "等待更多文本的时间（毫秒）",
   "translationCache": "翻译缓存",
-  "translationCacheDesc": "翻译结果缓存到本地，避免重复调用 API",
+  "translationCacheDesc": "按原文保存译文，相同文本不再请求。双语只在屏幕上拼接，不另外存一份。",
   "deepseekInfo": "任意 OpenAI 兼容接口。可填 base URL（https://host/v1）或完整的 /chat/completions。支持从 /models 拉取模型，也可以手填模型名。本地服务可以不填 API Key。",
   "promptHint": "点击编辑翻译指令...",
   "restoreDefault": "恢复默认",
@@ -113,5 +113,13 @@
         "type": "int"
       }
     }
-  }
+  },
+  "concurrency": "并发数",
+  "concurrencyDesc": "同时发出的翻译请求数",
+  "maxParagraphs": "最多段落",
+  "maxParagraphsDesc": "一篇正文切块时，一块里最多放几个段落",
+  "maxChars": "最多字符",
+  "maxCharsDesc": "超过后按段落或句子切开，分成多次请求",
+  "bilingual": "双语显示",
+  "bilingualDesc": "译文和原文一起显示"
 }

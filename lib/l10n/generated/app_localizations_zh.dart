@@ -244,10 +244,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get batchConfig => '批处理配置';
 
   @override
-  String get batchSize => '批量大小';
+  String get batchSize => '单次最多控件';
 
   @override
-  String get batchSizeDesc => '每次 API 请求的最大文本数';
+  String get batchSizeDesc => '同一请求里的控件或切块条数。界面短文本整条分组，不切开。';
 
   @override
   String get batchWindow => '聚合窗口';
@@ -259,7 +259,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get translationCache => '翻译缓存';
 
   @override
-  String get translationCacheDesc => '翻译结果缓存到本地，避免重复调用 API';
+  String get translationCacheDesc => '按原文保存译文，相同文本不再请求。双语只在屏幕上拼接，不另外存一份。';
 
   @override
   String get deepseekInfo => '任意 OpenAI 兼容接口。可填 base URL（https://host/v1）或完整的 /chat/completions。支持从 /models 拉取模型，也可以手填模型名。本地服务可以不填 API Key。';
@@ -336,6 +336,29 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get hookComposeDesc => 'App 带 Compose 时 Hook TextLayout / Paragraph，没有这些类就跳过';
 
+  @override
+  String get concurrency => '并发数';
+
+  @override
+  String get concurrencyDesc => '同时发出的翻译请求数';
+
+  @override
+  String get maxParagraphs => '最多段落';
+
+  @override
+  String get maxParagraphsDesc => '一篇正文切块时，一块里最多放几个段落';
+
+  @override
+  String get maxChars => '最多字符';
+
+  @override
+  String get maxCharsDesc => '超过后按段落或句子切开，分成多次请求';
+
+  @override
+  String get bilingual => '双语显示';
+
+  @override
+  String get bilingualDesc => '译文和原文一起显示';
   @override
   String modelsFetched(Object count) {
     return '已拉取 $count 个模型';

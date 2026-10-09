@@ -707,6 +707,22 @@ abstract class AppLocalizations {
   String get hookCompose;
 
   String get hookComposeDesc;
+
+  String get concurrency;
+
+  String get concurrencyDesc;
+
+  String get maxParagraphs;
+
+  String get maxParagraphsDesc;
+
+  String get maxChars;
+
+  String get maxCharsDesc;
+
+  String get bilingual;
+
+  String get bilingualDesc;
 }
 
 class _AppLocalizationsDelegate
