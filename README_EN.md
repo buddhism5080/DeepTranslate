@@ -54,6 +54,8 @@ flutter pub get
 flutter build apk --release
 ```
 
+Pushes to `main` also build on GitHub Actions. The APK is the `deeptranslate-apk` artifact of that run, not a GitHub Release. Without a keystore the APK is signed with the debug key.
+
 Requirements:
 
 - Flutter SDK >= 3.9

@@ -54,6 +54,8 @@ flutter pub get
 flutter build apk --release
 ```
 
+推到 `main` 时 GitHub Actions 也会编。APK 在该次运行的 Artifacts 里，文件名 `deeptranslate-apk`，不会自动发 Release。没有签名密钥时用 debug 签名。
+
 依赖:
 
 - Flutter SDK >= 3.9
