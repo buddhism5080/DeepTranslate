@@ -32,8 +32,9 @@
 
 | 支持 | 不支持 |
 |--------|----------|
-| 原生 TextView（Twitter、Telegram、Reddit、Gmail 等） | Flutter（Skia 直接渲染，没有 TextView） |
-| StaticLayout / BoringLayout | React Native / Weex |
+| 原生 TextView（Twitter、Telegram、Reddit、Gmail 等） | Flutter（字在 libflutter.so 里由 Skia/Impeller 画出，Java 层没有这段文字） |
+| StaticLayout / BoringLayout | Weex |
+| React Native 旧 TextView，以及 Fabric 的 PreparedLayoutTextView | |
 | Compose 文本（类存在时） | |
 | WebView 可见正文 | |
 

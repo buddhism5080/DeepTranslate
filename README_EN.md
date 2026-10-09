@@ -32,8 +32,9 @@
 
 | Supported | Not supported |
 |-----------|---------------|
-| Native TextView (Twitter, Telegram, Reddit, Gmail, etc.) | Flutter (Skia, no TextView) |
-| StaticLayout / BoringLayout | React Native / Weex |
+| Native TextView (Twitter, Telegram, Reddit, Gmail, etc.) | Flutter (glyphs are drawn inside libflutter.so by Skia/Impeller; Java never sees the string) |
+| StaticLayout / BoringLayout | Weex |
+| React Native TextView, and Fabric PreparedLayoutTextView | |
 | Compose text, when those classes exist | |
 | Visible WebView text | |
 

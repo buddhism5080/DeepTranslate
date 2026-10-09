@@ -6,6 +6,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.util.Log
 import io.github.kirby.deeptranslate.xposed.hook.LayoutHook
+import io.github.kirby.deeptranslate.xposed.hook.ReactNativeHook
 import io.github.kirby.deeptranslate.xposed.hook.TextViewHook
 import io.github.kirby.deeptranslate.xposed.hook.WebViewHook
 import io.github.libxposed.api.XposedModuleInterface.PackageLoadedParam
@@ -58,6 +59,7 @@ class DeepTranslateModule : XposedModule() {
         if (pkg == "io.github.kirby.deeptranslate") return
         TextViewHook.init(this, param)
         LayoutHook.init(this, param)
+        ReactNativeHook.init(this, param)
         WebViewHook.init(this, param)
     }
 
