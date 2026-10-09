@@ -1,6 +1,6 @@
 # DeepTranslate
 
-> LSPosed real-time translation module powered by DeepSeek API. Hooks native Android UI text for automatic translation.
+> LSPosed real-time translation module. Hooks native UI text and calls any OpenAI-compatible API.
 
 [中文](README.md)
 
@@ -16,29 +16,31 @@
 
 ## Features
 
-- **Global Text Translation** -- Hooks `TextView.setText()` to intercept and replace foreign text
-- **Contextual Batching** -- Aggregates multiple text fragments from the same page into one AI request, preserving semantic context and avoiding word-by-word machine translation errors
-- **SQLite Translation Cache** -- Persistent caching with zero API calls and zero latency on cache hit
-- **Automatic Language Detection** -- DeepSeek API auto-detects source language, no manual specification needed
-- **Span Style Preservation** -- Retains original text styling (color, weight, size, alignment) after translation
-- **Token/Balance Tracking** -- Home screen shows DeepSeek account balance and cumulative token usage with toast notifications
-- **Cache Details** -- Per-app cache entry counts with individual or bulk clear support (root-based database deletion)
-- **Material 3 UI** -- Flutter configuration panel with frosted glass effects, auto model list fetching, 8 language support
+- **Global text translation** -- Hooks `TextView.setText()`, plus `StaticLayout` / `BoringLayout`
+- **Compose text** -- Hooks `TextLayout` / `AndroidParagraphIntrinsics` when the target app ships Compose
+- **WebView** -- Translates visible page text. Skips inputs, scripts, and styles
+- **Custom OpenAI-compatible API** -- Base URL (`https://host/v1`) or a full `/chat/completions` URL
+- **Custom model** -- Type a model id, or fetch `/models` and pick one. API key can be empty for local servers
+- **Contextual batching** -- One request for the texts collected on a page
+- **SQLite cache** -- Cache hits skip the API. Translations are remembered so a relayout does not translate them again
+- **Span preservation** -- The `TextView.setText` path keeps color, weight, size, and alignment
+- **Material 3 UI** -- Layout text, WebView, and Compose can be toggled separately
 
 ## Compatibility
 
-| Supported | Not Supported |
+| Supported | Not supported |
 |-----------|---------------|
-| Native Android Apps (Twitter, Telegram, Reddit, Gmail, etc.) | Flutter Apps (Skia direct rendering, no TextView) |
-| LayoutInflater-generated UI | React Native / Weex |
-| View-based interfaces | WebView embedded pages |
+| Native TextView (Twitter, Telegram, Reddit, Gmail, etc.) | Flutter (Skia, no TextView) |
+| StaticLayout / BoringLayout | React Native / Weex |
+| Compose text, when those classes exist | |
+| Visible WebView text | |
 
 ## Usage
 
 1. Install APK, enable the module in LSPosed
 2. Select target apps in LSPosed scope settings
-3. Open DeepTranslate App -> Config -> enter your DeepSeek API Key
-4. Toggle "Global Translation" on the home screen
+3. Open DeepTranslate -> Config. The URL can be `https://host/v1` or a full `/chat/completions` URL. API key can be empty for a local server. Type a model id, or tap Fetch Models
+4. Turn on Global Translation. Layout text, WebView, and Compose can be disabled separately in Settings
 5. Restart target apps, text will translate automatically
 
 > First translation triggers contextual batching (aggregates text within a 100ms window). Results appear shortly.
@@ -68,21 +70,26 @@ XposedService              RemotePreferences cross-process sync
      |
 Kotlin Hook (android/)     Runs inside target app processes
   +-- DeepTranslateModule   XposedModule entry, registers broadcast receivers
-  +-- TextViewHook          Core: hooks TextView.setText()
+  +-- TextViewHook          Hooks TextView.setText()
+  +-- LayoutHook            StaticLayout / BoringLayout / Compose
+  +-- WebViewHook           Visible WebView text
   +-- TextBatcher           Contextual batching (time window + count limit)
-  +-- TranslationEngine     DeepSeek API calls (OpenAI-compatible protocol)
+  +-- TranslationEngine     OpenAI-compatible chat/completions
   +-- TranslationCache      SQLite persistent cache
   +-- LanguageDetector      Fast language detection (CJK character ratio)
 ```
 
-## DeepSeek API
+## OpenAI-compatible API
 
-| Item | Value |
-|------|-------|
-| Endpoint | `https://api.deepseek.com/v1/chat/completions` |
-| Default Model | `deepseek-v4-flash` |
-| Protocol | OpenAI-compatible, Bearer Token |
-| Pricing | 1 CNY/M input tokens, 2 CNY/M output tokens |
+Any of these is accepted:
+
+| Input | Requests |
+|---|---|
+| `https://api.deepseek.com/v1` | `…/v1/chat/completions`, model list `…/v1/models` |
+| `https://api.openai.com/v1/chat/completions` | Used as the chat URL; model list is the sibling `/models` |
+| `http://127.0.0.1:11434/v1` | Local OpenAI-compatible server. API key can be empty |
+
+The default model is still `deepseek-v4-flash`. Replace it with any id the endpoint returns. The protocol is OpenAI chat completions with a Bearer token.
 
 ## License
 

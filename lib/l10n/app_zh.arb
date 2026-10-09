@@ -21,7 +21,7 @@
   "cancel": "取消",
   "confirm": "确定",
   "usageNotes": "使用说明",
-  "note1": "1. 在「翻译配置」页填入 DeepSeek API Key",
+  "note1": "1. 在「翻译配置」填写 OpenAI 兼容接口和模型",
   "note2": "2. 在 LSPosed 中启用模块，勾选要翻译的 App",
   "note3": "3. 重启目标 App，页面文字将自动翻译",
   "note4": "4. 翻译结果会缓存，下次不重复翻译",
@@ -70,9 +70,9 @@
   "cachedTranslations": "已缓存翻译",
   "clearCacheFailed": "清空失败",
   "appSubtitle": "LSPosed 全局实时翻译模块",
-  "engineDesc": "DeepSeek API (OpenAI 兼容)",
-  "apiUrlHint": "https://api.deepseek.com/v1/chat/completions",
-  "apiKeyHint": "sk-xxxxxxxxxxxxxxxx",
+  "engineDesc": "OpenAI 兼容 API",
+  "apiUrlHint": "https://api.deepseek.com/v1 或完整的 /chat/completions",
+  "apiKeyHint": "本地服务可留空",
   "timeoutSeconds": "{seconds} 秒",
   "temperatureDesc": "越低越确定，越高越有创造性",
   "maxTokensDesc": "单次响应上限",
@@ -83,7 +83,7 @@
   "batchWindowDesc": "等待更多文本的时间（毫秒）",
   "translationCache": "翻译缓存",
   "translationCacheDesc": "翻译结果缓存到本地，避免重复调用 API",
-  "deepseekInfo": "DeepSeek API 兼容 OpenAI 协议。默认使用 deepseek-chat 模型，支持 prompt caching 可降低重复请求成本。批处理模式会将同一页面的多条文本聚合并附带上下文发送，避免单词条翻译的机翻失真。",
+  "deepseekInfo": "任意 OpenAI 兼容接口。可填 base URL（https://host/v1）或完整的 /chat/completions。支持从 /models 拉取模型，也可以手填模型名。本地服务可以不填 API Key。",
   "promptHint": "点击编辑翻译指令...",
   "restoreDefault": "恢复默认",
   "promptEditHint": "输入翻译指令...",
@@ -95,5 +95,23 @@
   "clearAppCacheContent": "确定清空 {package} 的翻译缓存统计？",
   "appCacheCleared": "已清空 {package} 的缓存",
   "clearAllCacheStatsContent": "确定清空所有应用的翻译缓存统计？",
-  "cacheEntry": "{count} 条缓存 · {package}"
+  "cacheEntry": "{count} 条缓存 · {package}",
+  "modelHint": "可手填，或拉取后从列表选择",
+  "modelEmpty": "模型不能为空",
+  "modelsFetchFailed": "拉取模型失败",
+  "modelsFetched": "已拉取 {count} 个模型",
+  "coverageTitle": "覆盖范围",
+  "hookLayout": "布局文本",
+  "hookLayoutDesc": "StaticLayout / BoringLayout，补上不走 setText 的文字",
+  "hookWebView": "WebView",
+  "hookWebViewDesc": "翻译网页可见文字，跳过输入框",
+  "hookCompose": "Compose 文本",
+  "hookComposeDesc": "App 带 Compose 时 Hook TextLayout / Paragraph，没有这些类就跳过",
+  "@modelsFetched": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  }
 }

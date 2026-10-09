@@ -21,7 +21,7 @@
   "cancel": "キャンセル",
   "confirm": "確認",
   "usageNotes": "使い方",
-  "note1": "1. 翻訳設定でDeepSeek APIキーを入力",
+  "note1": "1. Set an OpenAI-compatible API URL and model in Config",
   "note2": "2. LSPosedでモジュールを有効にし、対象アプリを選択",
   "note3": "3. 対象アプリを再起動すると自動的に翻訳されます",
   "note4": "4. 翻訳結果はキャッシュされ、繰り返しAPIを呼び出しません",
@@ -70,9 +70,9 @@
   "cachedTranslations": "キャッシュ翻訳",
   "clearCacheFailed": "削除失敗",
   "appSubtitle": "LSPosed グローバルリアルタイム翻訳モジュール",
-  "engineDesc": "DeepSeek API (OpenAI互換)",
-  "apiUrlHint": "https://api.deepseek.com/v1/chat/completions",
-  "apiKeyHint": "sk-xxxxxxxxxxxxxxxx",
+  "engineDesc": "OpenAI-compatible API",
+  "apiUrlHint": "https://api.deepseek.com/v1 or .../chat/completions",
+  "apiKeyHint": "optional for local servers",
   "timeoutSeconds": "{seconds}秒",
   "temperatureDesc": "低いほど確定的、高いほど創造的",
   "maxTokensDesc": "1回の応答の最大長",
@@ -83,7 +83,7 @@
   "batchWindowDesc": "テキストを待機する時間（ミリ秒）",
   "translationCache": "翻訳キャッシュ",
   "translationCacheDesc": "翻訳結果をローカルにキャッシュし、API呼び出しを繰り返さない",
-  "deepseekInfo": "DeepSeek APIはOpenAIプロトコルと互換性があります。デフォルトではdeepseek-chatモデルを使用し、プロンプトキャッシングをサポートして繰り返しリクエストのコストを削減します。バッチモードは同じページの複数のテキストをコンテキストとともに集約し、単語単位の翻訳による不自然さを防ぎます。",
+  "deepseekInfo": "Any OpenAI-compatible API. Use a base URL (https://host/v1) or the full /chat/completions URL. Fetch models from /models, or type a model id. API key can be empty for local servers.",
   "promptHint": "タップして翻訳プロンプトを編集...",
   "restoreDefault": "デフォルトに戻す",
   "promptEditHint": "翻訳プロンプトを入力...",
@@ -95,5 +95,23 @@
   "clearAppCacheContent": "{package} のキャッシュ統計を削除しますか？",
   "appCacheCleared": "{package} のキャッシュを削除しました",
   "clearAllCacheStatsContent": "すべてのアプリのキャッシュ統計を削除しますか？",
-  "cacheEntry": "{count} 件 · {package}"
+  "cacheEntry": "{count} 件 · {package}",
+  "modelHint": "Type a model id, or pick one after fetching",
+  "modelEmpty": "Model cannot be empty",
+  "modelsFetchFailed": "Failed to fetch models",
+  "modelsFetched": "Fetched {count} models",
+  "coverageTitle": "Coverage",
+  "hookLayout": "Layout text",
+  "hookLayoutDesc": "StaticLayout and BoringLayout, for text that never calls setText",
+  "hookWebView": "WebView",
+  "hookWebViewDesc": "Visible web page text. Inputs are skipped",
+  "hookCompose": "Compose text",
+  "hookComposeDesc": "Hooks Compose TextLayout / Paragraph when those classes exist",
+  "@modelsFetched": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  }
 }

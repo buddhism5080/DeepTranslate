@@ -21,7 +21,7 @@
   "cancel": "Abbrechen",
   "confirm": "Bestätigen",
   "usageNotes": "Hinweise",
-  "note1": "1. DeepSeek API-Key eingeben",
+  "note1": "1. Set an OpenAI-compatible API URL and model in Config",
   "note2": "2. Modul in LSPosed aktivieren",
   "note3": "3. Apps neu starten",
   "note4": "4. Übersetzungen werden gecached",
@@ -36,7 +36,8 @@
   "clearAllCacheConfirm": "Alle löschen",
   "cacheManagement": "Cache-Verwaltung",
   "cachedCount": "{count} Einträge · Details",
-    "save": "Speichern", "configSaved": "Gespeichert",
+  "save": "Speichern",
+  "configSaved": "Gespeichert",
   "settings": "Einstellungen",
   "themeSystem": "System folgen",
   "themeLight": "Hell",
@@ -44,9 +45,9 @@
   "cachedTranslations": "Zwischengespeicherte Übersetzungen",
   "clearCacheFailed": "Löschen fehlgeschlagen",
   "appSubtitle": "LSPosed Globales Echtzeit-Übersetzungsmodul",
-  "engineDesc": "DeepSeek API (OpenAI-kompatibel)",
-  "apiUrlHint": "https://api.deepseek.com/v1/chat/completions",
-  "apiKeyHint": "sk-xxxxxxxxxxxxxxxx",
+  "engineDesc": "OpenAI-compatible API",
+  "apiUrlHint": "https://api.deepseek.com/v1 or .../chat/completions",
+  "apiKeyHint": "optional for local servers",
   "timeoutSeconds": "{seconds} s",
   "temperatureDesc": "Niedriger = deterministischer, höher = kreativer",
   "maxTokensDesc": "Maximale Antwortlänge",
@@ -57,7 +58,7 @@
   "batchWindowDesc": "Wartezeit auf mehr Text (ms)",
   "translationCache": "Übersetzungs-Cache",
   "translationCacheDesc": "Übersetzungen lokal cachen, um wiederholte API-Aufrufe zu vermeiden",
-  "deepseekInfo": "DeepSeek API ist kompatibel mit dem OpenAI-Protokoll. Standardmäßig wird das deepseek-chat-Modell verwendet, unterstützt Prompt Caching zur Kostensenkung. Der Batch-Modus bündelt mehrere Texte einer Seite mit Kontext, um wortwörtliche Übersetzungsfehler zu vermeiden.",
+  "deepseekInfo": "Any OpenAI-compatible API. Use a base URL (https://host/v1) or the full /chat/completions URL. Fetch models from /models, or type a model id. API key can be empty for local servers.",
   "promptHint": "Tippen, um Übersetzungs-Prompt zu bearbeiten...",
   "restoreDefault": "Standard wiederherstellen",
   "promptEditHint": "Übersetzungs-Prompt eingeben...",
@@ -69,5 +70,23 @@
   "clearAppCacheContent": "Cache-Statistiken für {package} löschen?",
   "appCacheCleared": "Cache für {package} geleert",
   "clearAllCacheStatsContent": "Alle App-Cache-Statistiken löschen?",
-  "cacheEntry": "{count} Einträge · {package}"
+  "cacheEntry": "{count} Einträge · {package}",
+  "modelHint": "Type a model id, or pick one after fetching",
+  "modelEmpty": "Model cannot be empty",
+  "modelsFetchFailed": "Failed to fetch models",
+  "modelsFetched": "Fetched {count} models",
+  "coverageTitle": "Coverage",
+  "hookLayout": "Layout text",
+  "hookLayoutDesc": "StaticLayout and BoringLayout, for text that never calls setText",
+  "hookWebView": "WebView",
+  "hookWebViewDesc": "Visible web page text. Inputs are skipped",
+  "hookCompose": "Compose text",
+  "hookComposeDesc": "Hooks Compose TextLayout / Paragraph when those classes exist",
+  "@modelsFetched": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  }
 }

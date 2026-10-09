@@ -72,7 +72,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get usageNotes => '使用说明';
 
   @override
-  String get note1 => '1. 在「翻译配置」页填入 DeepSeek API Key';
+  String get note1 => '1. 在「翻译配置」填写 OpenAI 兼容接口和模型';
 
   @override
   String get note2 => '2. 在 LSPosed 中启用模块，勾选要翻译的 App';
@@ -221,13 +221,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get appSubtitle => 'LSPosed 全局实时翻译模块';
 
   @override
-  String get engineDesc => 'DeepSeek API (OpenAI 兼容)';
+  String get engineDesc => 'OpenAI 兼容 API';
 
   @override
-  String get apiUrlHint => 'https://api.deepseek.com/v1/chat/completions';
+  String get apiUrlHint => 'https://api.deepseek.com/v1 或完整的 /chat/completions';
 
   @override
-  String get apiKeyHint => 'sk-xxxxxxxxxxxxxxxx';
+  String get apiKeyHint => '本地服务可留空';
 
   @override
   String timeoutSeconds(Object seconds) {
@@ -262,8 +262,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get translationCacheDesc => '翻译结果缓存到本地，避免重复调用 API';
 
   @override
-  String get deepseekInfo =>
-      'DeepSeek API 兼容 OpenAI 协议。默认使用 deepseek-chat 模型，支持 prompt caching 可降低重复请求成本。批处理模式会将同一页面的多条文本聚合并附带上下文发送，避免单词条翻译的机翻失真。';
+  String get deepseekInfo => '任意 OpenAI 兼容接口。可填 base URL（https://host/v1）或完整的 /chat/completions。支持从 /models 拉取模型，也可以手填模型名。本地服务可以不填 API Key。';
 
   @override
   String get promptHint => '点击编辑翻译指令...';
@@ -305,5 +304,40 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String cacheEntry(Object count, Object package) {
     return '$count 条缓存 · $package';
+  }
+
+  @override
+  String get modelHint => '可手填，或拉取后从列表选择';
+
+  @override
+  String get modelEmpty => '模型不能为空';
+
+  @override
+  String get modelsFetchFailed => '拉取模型失败';
+
+  @override
+  String get coverageTitle => '覆盖范围';
+
+  @override
+  String get hookLayout => '布局文本';
+
+  @override
+  String get hookLayoutDesc => 'StaticLayout / BoringLayout，补上不走 setText 的文字';
+
+  @override
+  String get hookWebView => 'WebView';
+
+  @override
+  String get hookWebViewDesc => '翻译网页可见文字，跳过输入框';
+
+  @override
+  String get hookCompose => 'Compose 文本';
+
+  @override
+  String get hookComposeDesc => 'App 带 Compose 时 Hook TextLayout / Paragraph，没有这些类就跳过';
+
+  @override
+  String modelsFetched(Object count) {
+    return '已拉取 $count 个模型';
   }
 }

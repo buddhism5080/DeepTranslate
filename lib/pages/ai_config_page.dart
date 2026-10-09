@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../controllers/settings_controller.dart';
+import '../services/openai_endpoint.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../services/interaction_haptics.dart';
 import '../widgets/section_label.dart';
@@ -28,6 +29,7 @@ class _AiConfigPageState extends State<AiConfigPage> {
   bool _testing = false;
   bool _fetchingModels = false;
   List<String> _availableModels = [];
+  String? _modelsStatus;
   _TestResult? _testResult;
 
   late int _aiTimeoutDraft;
@@ -105,6 +107,15 @@ class _AiConfigPageState extends State<AiConfigPage> {
       setState(() => _testResult = _TestResult.fail(l10n.apiUrlEmpty));
       return;
     }
+    final endpoints = OpenAiEndpoints.resolve(url);
+    if (endpoints == null) {
+      setState(() => _testResult = _TestResult.fail(l10n.apiUrlEmpty));
+      return;
+    }
+    if (model.isEmpty) {
+      setState(() => _testResult = _TestResult.fail(l10n.modelEmpty));
+      return;
+    }
 
     setState(() {
       _testing = true;
@@ -113,7 +124,7 @@ class _AiConfigPageState extends State<AiConfigPage> {
 
     try {
       final requestBody = jsonEncode({
-        'model': model.isEmpty ? 'deepseek-chat' : model,
+        'model': model,
         'messages': [
           {
             'role': 'system',
@@ -127,7 +138,7 @@ class _AiConfigPageState extends State<AiConfigPage> {
 
       final response = await http
           .post(
-            Uri.parse(url),
+            Uri.parse(endpoints.chat),
             headers: {
               'Content-Type': 'application/json',
               'Accept': 'application/json',
@@ -157,46 +168,50 @@ class _AiConfigPageState extends State<AiConfigPage> {
   }
 
   Future<void> _fetchModels() async {
+    final l10n = AppLocalizations.of(context)!;
     final url = _urlCtrl.text.trim();
     final key = _keyCtrl.text.trim();
-    if (url.isEmpty || key.isEmpty) return;
+    final endpoints = OpenAiEndpoints.resolve(url);
+    if (endpoints == null) {
+      setState(() => _modelsStatus = l10n.apiUrlEmpty);
+      return;
+    }
 
-    setState(() => _fetchingModels = true);
+    setState(() {
+      _fetchingModels = true;
+      _modelsStatus = null;
+    });
 
     try {
-      final modelsUrl = _deriveModelsUrl(url);
       final response = await http
-          .get(Uri.parse(modelsUrl),
+          .get(Uri.parse(endpoints.models),
             headers: {
               'Accept': 'application/json',
-              'Authorization': 'Bearer $key',
+              if (key.isNotEmpty) 'Authorization': 'Bearer $key',
             })
-          .timeout(const Duration(seconds: 10));
+          .timeout(const Duration(seconds: 15));
 
       if (response.statusCode == 200) {
-        final json = jsonDecode(response.body) as Map<String, dynamic>;
-        final data = json['data'] as List? ?? [];
-        final models = data
-            .whereType<Map>()
-            .map((m) => m['id'] as String? ?? '')
-            .where((id) => id.isNotEmpty)
-            .toList();
-        models.sort();
-        if (mounted) setState(() => _availableModels = models);
+        final models = parseModelIds(jsonDecode(response.body));
+        if (mounted) {
+          setState(() {
+            _availableModels = models;
+            _modelsStatus = models.isEmpty
+                ? l10n.modelsFetchFailed
+                : l10n.modelsFetched(models.length);
+          });
+        }
+      } else {
+        if (mounted) {
+          setState(() => _modelsStatus =
+              '${l10n.modelsFetchFailed} (HTTP ${response.statusCode})');
+        }
       }
-    } catch (_) {
+    } catch (e) {
+      if (mounted) setState(() => _modelsStatus = '${l10n.modelsFetchFailed}: $e');
     } finally {
       if (mounted) setState(() => _fetchingModels = false);
     }
-  }
-
-  String _deriveModelsUrl(String chatUrl) {
-    var u = chatUrl.trim();
-    while (u.endsWith('/')) u = u.substring(0, u.length - 1);
-    // https://api.deepseek.com/v1/chat/completions → https://api.deepseek.com/models
-    final idx = u.indexOf('/v1');
-    if (idx >= 0) return '${u.substring(0, idx)}/models';
-    return '$u/models';
   }
 
   @override
@@ -268,7 +283,7 @@ class _AiConfigPageState extends State<AiConfigPage> {
                             const SizedBox(width: 12),
                             Expanded(
                               child: OutlinedButton.icon(
-                                onPressed: (_fetchingModels || _keyCtrl.text.trim().isEmpty) ? null : _fetchModels,
+                                onPressed: _fetchingModels ? null : _fetchModels,
                                 icon: _fetchingModels
                                     ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
                                     : const FaIcon(FontAwesomeIcons.list, size: 14),
@@ -278,6 +293,13 @@ class _AiConfigPageState extends State<AiConfigPage> {
                             ),
                           ],
                         ),
+                        if (_modelsStatus != null) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            _modelsStatus!,
+                            style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                          ),
+                        ],
                         if (_testResult != null) ...[
                           const SizedBox(height: 8),
                           _TestResultCard(result: _testResult!),
@@ -568,32 +590,41 @@ class _AiConfigPageState extends State<AiConfigPage> {
   Widget _buildModelSelector() {
     final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
-
-    if (_availableModels.isNotEmpty) {
-      final current = _modelCtrl.text;
-      return DropdownMenu<String>(
-        initialSelection: _availableModels.contains(current) ? current : _availableModels.first,
-        dropdownMenuEntries: _availableModels.map((m) => DropdownMenuEntry(value: m, label: m, style: MenuItemButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 12)))).toList(),
-        onSelected: (v) {
-          if (v != null) _modelCtrl.text = v;
-        },
-        expandedInsets: EdgeInsets.zero,
-        inputDecorationTheme: InputDecorationTheme(
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: cs.outlineVariant)),
-          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: cs.primary, width: 2)),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+    final current = _modelCtrl.text;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildTextField(
+          controller: _modelCtrl,
+          label: l10n.model,
+          hint: l10n.modelHint,
+          icon: FontAwesomeIcons.lightbulb,
         ),
-        label: Text(l10n.model),
-        leadingIcon: const Padding(padding: EdgeInsets.all(12), child: FaIcon(FontAwesomeIcons.lightbulb, size: 18)),
-      );
-    }
-
-    return _buildTextField(
-      controller: _modelCtrl,
-      label: l10n.model,
-      hint: 'deepseek-v4-flash',
-      icon: FontAwesomeIcons.lightbulb,
+        if (_availableModels.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          DropdownButtonFormField<String>(
+            isExpanded: true,
+            value: _availableModels.contains(current) ? current : null,
+            hint: Text(l10n.fetchModels),
+            items: _availableModels
+                .map((m) => DropdownMenuItem(
+                      value: m,
+                      child: Text(m, overflow: TextOverflow.ellipsis),
+                    ))
+                .toList(),
+            onChanged: (v) {
+              if (v != null) setState(() => _modelCtrl.text = v);
+            },
+            decoration: InputDecoration(
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: cs.outlineVariant),
+              ),
+            ),
+          ),
+        ],
+      ],
     );
   }
 

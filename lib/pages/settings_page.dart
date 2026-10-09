@@ -171,6 +171,41 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
                 const SizedBox(height: 8),
 
+                SectionLabel(l10n.coverageTitle),
+                const SizedBox(height: 8),
+                Card(
+                  elevation: 0,
+                  color: cs.surfaceContainerHighest,
+                  child: Column(
+                    children: [
+                      SwitchListTile(
+                        secondary: const Icon(Icons.view_agenda_outlined),
+                        title: Text(l10n.hookLayout),
+                        subtitle: Text(l10n.hookLayoutDesc),
+                        value: _ctrl.hookLayout,
+                        onChanged: (v) => _ctrl.setHookLayout(v),
+                      ),
+                      const Divider(height: 1, indent: 16, endIndent: 16),
+                      SwitchListTile(
+                        secondary: const Icon(Icons.public),
+                        title: Text(l10n.hookWebView),
+                        subtitle: Text(l10n.hookWebViewDesc),
+                        value: _ctrl.hookWebView,
+                        onChanged: (v) => _ctrl.setHookWebView(v),
+                      ),
+                      const Divider(height: 1, indent: 16, endIndent: 16),
+                      SwitchListTile(
+                        secondary: const Icon(Icons.layers_outlined),
+                        title: Text(l10n.hookCompose),
+                        subtitle: Text(l10n.hookComposeDesc),
+                        value: _ctrl.hookCompose,
+                        onChanged: (v) => _ctrl.setHookCompose(v),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 8),
+
                 // ── 缓存管理 ──
                 SectionLabel(l10n.cacheManagement),
                 const SizedBox(height: 8),

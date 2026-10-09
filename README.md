@@ -1,6 +1,6 @@
 # DeepTranslate
 
-> LSPosed 全局实时翻译模块，基于 DeepSeek API，Hook 原生 Android 页面文字自动翻译。
+> LSPosed 全局实时翻译模块。Hook 原生界面文字，接口是任意 OpenAI 兼容 API。
 
 [English](README_EN.md)
 
@@ -16,29 +16,31 @@
 
 ## 功能
 
-- **全局文字翻译** -- Hook `TextView.setText()` 拦截外文文字，替换为目标语言
-- **语境批处理** -- 聚合同一页面的多条文本一次性发送给 AI，结合上下文理解语义，避免逐词机翻
-- **SQLite 翻译缓存** -- 翻译结果持久化，命中缓存零 API 调用、零延迟
-- **自动语言识别** -- DeepSeek API 自动检测源语言，无需指定
-- **Span 样式保留** -- 翻译后保留原文字的颜色、粗细、字号、对齐等视觉样式
-- **Token/额度统计** -- 首页显示 DeepSeek 账户余额和累计 Token 消耗，翻译时弹 Toast
-- **缓存详情** -- 按应用显示缓存条数，支持单独或全部清空（通过 root 直删数据库文件）
-- **Material 3 UI** -- Flutter 配置面板，毛玻璃效果，自动拉取可用模型列表，8 种语言支持
+- **全局文字翻译** -- Hook `TextView.setText()`，并补上 `StaticLayout` / `BoringLayout`
+- **Compose 文本** -- 目标 App 带 Compose 时 Hook `TextLayout` / `AndroidParagraphIntrinsics`
+- **WebView** -- 翻译网页里的可见文本，跳过输入框、脚本和样式
+- **自定义 OpenAI 兼容接口** -- 可填 base URL（`https://host/v1`）或完整的 `/chat/completions`
+- **自定义模型** -- 手填模型名，或从 `/models` 拉取后选择。API Key 对本地服务可以留空
+- **语境批处理** -- 聚合同一页面的多条文本一次性发送，结合上下文翻译
+- **SQLite 翻译缓存** -- 命中缓存零 API 调用。译文会记下来，避免刷新后再送去翻译
+- **Span 样式保留** -- `TextView.setText` 路径保留颜色、粗细、字号、对齐
+- **Material 3 UI** -- 配置面板可分别开关布局文本、WebView、Compose
 
 ## 适用范围
 
 | 支持 | 不支持 |
 |--------|----------|
-| 原生 Android App（Twitter、Telegram、Reddit、Gmail 等） | Flutter App（Skia 直接渲染，无 TextView） |
-| LayoutInflater 生成的 UI | React Native / Weex |
-| View-based 界面 | WebView 内嵌网页 |
+| 原生 TextView（Twitter、Telegram、Reddit、Gmail 等） | Flutter（Skia 直接渲染，没有 TextView） |
+| StaticLayout / BoringLayout | React Native / Weex |
+| Compose 文本（类存在时） | |
+| WebView 可见正文 | |
 
 ## 使用
 
 1. 安装 APK，在 LSPosed 中启用模块
 2. 在 LSPosed 作用域中勾选要翻译的目标 App
-3. 打开 DeepTranslate App -> 翻译配置 -> 填入 DeepSeek API Key
-4. 首页开启"全局翻译"开关
+3. 打开 DeepTranslate -> 翻译配置。接口可以填 `https://host/v1`，也可以填完整的 `/chat/completions`。API Key 本地服务可留空。模型可以手填，也可以点「获取模型」
+4. 首页开启「全局翻译」。设置页可以分别关掉布局文本、WebView、Compose
 5. 重启目标 App，页面文字自动翻译
 
 > 首次翻译会触发上下文批处理（收集 100ms 内的多条文本），稍等即见翻译结果。
@@ -68,21 +70,26 @@ XposedService              RemotePreferences 跨进程同步
      |
 Kotlin Hook (android/)     运行在被翻译 App 的进程中
   +-- DeepTranslateModule   XposedModule 入口，注册广播接收器
-  +-- TextViewHook          核心: Hook TextView.setText()
+  +-- TextViewHook          Hook TextView.setText()
+  +-- LayoutHook            StaticLayout / BoringLayout / Compose
+  +-- WebViewHook           WebView 可见文本
   +-- TextBatcher           语境批处理（时间窗口 + 数量上限聚合）
-  +-- TranslationEngine     DeepSeek API 调用（OpenAI 兼容协议）
+  +-- TranslationEngine     OpenAI 兼容 chat/completions
   +-- TranslationCache      SQLite 持久化缓存
   +-- LanguageDetector      快速语言检测（CJK 字符比例）
 ```
 
-## DeepSeek API
+## OpenAI 兼容接口
 
-| 项 | 值 |
-|---|-----|
-| Endpoint | `https://api.deepseek.com/v1/chat/completions` |
-| 默认模型 | `deepseek-v4-flash` |
-| 协议 | OpenAI 兼容，Bearer Token |
-| 价格 | 1 CNY/百万输入 token，2 CNY/百万输出 token |
+可填下面任意一种：
+
+| 填写 | 实际请求 |
+|---|---|
+| `https://api.deepseek.com/v1` | `…/v1/chat/completions`，模型列表 `…/v1/models` |
+| `https://api.openai.com/v1/chat/completions` | 原样作为对话接口，模型列表换成同级 `/models` |
+| `http://127.0.0.1:11434/v1` | 本地 OpenAI 兼容服务，API Key 可留空 |
+
+默认模型仍是 `deepseek-v4-flash`，可以改成接口返回的任意模型名。协议是 OpenAI chat completions，Bearer Token。
 
 ## 许可
 

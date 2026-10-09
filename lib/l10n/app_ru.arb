@@ -21,7 +21,7 @@
   "cancel": "Отмена",
   "confirm": "Подтвердить",
   "usageNotes": "Инструкция",
-  "note1": "1. Введите API ключ DeepSeek",
+  "note1": "1. Set an OpenAI-compatible API URL and model in Config",
   "note2": "2. Включите модуль в LSPosed",
   "note3": "3. Перезапустите приложения",
   "note4": "4. Переводы кешируются",
@@ -36,7 +36,8 @@
   "clearAllCacheConfirm": "Удалить всё",
   "cacheManagement": "Управление кешем",
   "cachedCount": "{count} записей · подробнее",
-    "save": "Сохранить", "configSaved": "Сохранено",
+  "save": "Сохранить",
+  "configSaved": "Сохранено",
   "settings": "Настройки",
   "themeSystem": "Как в системе",
   "themeLight": "Светлая",
@@ -44,9 +45,9 @@
   "cachedTranslations": "Кешированные переводы",
   "clearCacheFailed": "Ошибка очистки",
   "appSubtitle": "Глобальный модуль перевода LSPosed в реальном времени",
-  "engineDesc": "DeepSeek API (совместим с OpenAI)",
-  "apiUrlHint": "https://api.deepseek.com/v1/chat/completions",
-  "apiKeyHint": "sk-xxxxxxxxxxxxxxxx",
+  "engineDesc": "OpenAI-compatible API",
+  "apiUrlHint": "https://api.deepseek.com/v1 or .../chat/completions",
+  "apiKeyHint": "optional for local servers",
   "timeoutSeconds": "{seconds} с",
   "temperatureDesc": "Ниже = детерминированнее, выше = креативнее",
   "maxTokensDesc": "Максимальная длина ответа",
@@ -57,7 +58,7 @@
   "batchWindowDesc": "Время ожидания текста (мс)",
   "translationCache": "Кеш переводов",
   "translationCacheDesc": "Кешировать переводы локально, избегая повторных вызовов API",
-  "deepseekInfo": "DeepSeek API совместим с протоколом OpenAI. По умолчанию используется модель deepseek-chat, поддерживает кеширование промптов для снижения затрат. Пакетный режим объединяет несколько текстов с одной страницы с контекстом, чтобы избежать дословных ошибок перевода.",
+  "deepseekInfo": "Any OpenAI-compatible API. Use a base URL (https://host/v1) or the full /chat/completions URL. Fetch models from /models, or type a model id. API key can be empty for local servers.",
   "promptHint": "Нажмите, чтобы редактировать промпт перевода...",
   "restoreDefault": "Восстановить умолчания",
   "promptEditHint": "Введите промпт перевода...",
@@ -69,5 +70,23 @@
   "clearAppCacheContent": "Очистить статистику кеша для {package}?",
   "appCacheCleared": "Кеш очищен для {package}",
   "clearAllCacheStatsContent": "Очистить статистику кеша всех приложений?",
-  "cacheEntry": "{count} записей · {package}"
+  "cacheEntry": "{count} записей · {package}",
+  "modelHint": "Type a model id, or pick one after fetching",
+  "modelEmpty": "Model cannot be empty",
+  "modelsFetchFailed": "Failed to fetch models",
+  "modelsFetched": "Fetched {count} models",
+  "coverageTitle": "Coverage",
+  "hookLayout": "Layout text",
+  "hookLayoutDesc": "StaticLayout and BoringLayout, for text that never calls setText",
+  "hookWebView": "WebView",
+  "hookWebViewDesc": "Visible web page text. Inputs are skipped",
+  "hookCompose": "Compose text",
+  "hookComposeDesc": "Hooks Compose TextLayout / Paragraph when those classes exist",
+  "@modelsFetched": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  }
 }

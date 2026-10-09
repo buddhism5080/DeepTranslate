@@ -21,7 +21,7 @@
   "cancel": "Cancelar",
   "confirm": "Confirmar",
   "usageNotes": "Notas",
-  "note1": "1. Ingresa tu API Key de DeepSeek",
+  "note1": "1. Set an OpenAI-compatible API URL and model in Config",
   "note2": "2. Activa el módulo en LSPosed",
   "note3": "3. Reinicia las apps, se traducirán",
   "note4": "4. Se almacena en caché",
@@ -68,9 +68,9 @@
   "cachedTranslations": "Traducciones en caché",
   "clearCacheFailed": "Error al borrar",
   "appSubtitle": "Módulo de traducción global en tiempo real LSPosed",
-  "engineDesc": "DeepSeek API (Compatible con OpenAI)",
-  "apiUrlHint": "https://api.deepseek.com/v1/chat/completions",
-  "apiKeyHint": "sk-xxxxxxxxxxxxxxxx",
+  "engineDesc": "OpenAI-compatible API",
+  "apiUrlHint": "https://api.deepseek.com/v1 or .../chat/completions",
+  "apiKeyHint": "optional for local servers",
   "timeoutSeconds": "{seconds} s",
   "temperatureDesc": "Más bajo = más determinista, más alto = más creativo",
   "maxTokensDesc": "Longitud máxima de respuesta",
@@ -81,7 +81,7 @@
   "batchWindowDesc": "Tiempo de espera para más texto (ms)",
   "translationCache": "Caché de traducción",
   "translationCacheDesc": "Guardar en caché para evitar llamadas repetidas a la API",
-  "deepseekInfo": "DeepSeek API es compatible con el protocolo OpenAI. Usa el modelo deepseek-chat por defecto, admite prompt caching para reducir costes. El modo lote agrupa textos de una misma página con contexto para evitar traducciones literales.",
+  "deepseekInfo": "Any OpenAI-compatible API. Use a base URL (https://host/v1) or the full /chat/completions URL. Fetch models from /models, or type a model id. API key can be empty for local servers.",
   "promptHint": "Toca para editar el prompt de traducción...",
   "restoreDefault": "Restaurar predeterminado",
   "promptEditHint": "Introduce el prompt de traducción...",
@@ -93,5 +93,23 @@
   "clearAppCacheContent": "¿Borrar estadísticas de caché de {package}?",
   "appCacheCleared": "Caché borrada para {package}",
   "clearAllCacheStatsContent": "¿Borrar todas las estadísticas de caché?",
-  "cacheEntry": "{count} entradas · {package}"
+  "cacheEntry": "{count} entradas · {package}",
+  "modelHint": "Type a model id, or pick one after fetching",
+  "modelEmpty": "Model cannot be empty",
+  "modelsFetchFailed": "Failed to fetch models",
+  "modelsFetched": "Fetched {count} models",
+  "coverageTitle": "Coverage",
+  "hookLayout": "Layout text",
+  "hookLayoutDesc": "StaticLayout and BoringLayout, for text that never calls setText",
+  "hookWebView": "WebView",
+  "hookWebViewDesc": "Visible web page text. Inputs are skipped",
+  "hookCompose": "Compose text",
+  "hookComposeDesc": "Hooks Compose TextLayout / Paragraph when those classes exist",
+  "@modelsFetched": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  }
 }

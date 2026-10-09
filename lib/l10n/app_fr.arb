@@ -21,7 +21,7 @@
   "cancel": "Annuler",
   "confirm": "Confirmer",
   "usageNotes": "Notes",
-  "note1": "1. Saisir la clé API DeepSeek",
+  "note1": "1. Set an OpenAI-compatible API URL and model in Config",
   "note2": "2. Activer le module dans LSPosed",
   "note3": "3. Redémarrer les apps",
   "note4": "4. Traductions mises en cache",
@@ -36,7 +36,8 @@
   "clearAllCacheConfirm": "Tout supprimer",
   "cacheManagement": "Gestion du cache",
   "cachedCount": "{count} entrées · détails",
-    "save": "Enregistrer", "configSaved": "Enregistré",
+  "save": "Enregistrer",
+  "configSaved": "Enregistré",
   "settings": "Paramètres",
   "themeSystem": "Suivre le système",
   "themeLight": "Clair",
@@ -44,9 +45,9 @@
   "cachedTranslations": "Traductions en cache",
   "clearCacheFailed": "Échec de la suppression",
   "appSubtitle": "Module de traduction temps réel LSPosed",
-  "engineDesc": "DeepSeek API (Compatible OpenAI)",
-  "apiUrlHint": "https://api.deepseek.com/v1/chat/completions",
-  "apiKeyHint": "sk-xxxxxxxxxxxxxxxx",
+  "engineDesc": "OpenAI-compatible API",
+  "apiUrlHint": "https://api.deepseek.com/v1 or .../chat/completions",
+  "apiKeyHint": "optional for local servers",
   "timeoutSeconds": "{seconds} s",
   "temperatureDesc": "Plus bas = plus déterministe, plus haut = plus créatif",
   "maxTokensDesc": "Longueur max de réponse",
@@ -57,7 +58,7 @@
   "batchWindowDesc": "Temps d'attente pour plus de texte (ms)",
   "translationCache": "Cache de traduction",
   "translationCacheDesc": "Mettre en cache localement pour éviter les appels API répétés",
-  "deepseekInfo": "DeepSeek API est compatible avec le protocole OpenAI. Utilise le modèle deepseek-chat par défaut, prend en charge le prompt caching pour réduire les coûts. Le mode lot regroupe plusieurs textes d'une même page avec contexte pour éviter les traductions mot à mot.",
+  "deepseekInfo": "Any OpenAI-compatible API. Use a base URL (https://host/v1) or the full /chat/completions URL. Fetch models from /models, or type a model id. API key can be empty for local servers.",
   "promptHint": "Appuyez pour modifier le prompt de traduction...",
   "restoreDefault": "Rétablir par défaut",
   "promptEditHint": "Saisissez le prompt de traduction...",
@@ -69,5 +70,23 @@
   "clearAppCacheContent": "Supprimer les stats de cache de {package} ?",
   "appCacheCleared": "Cache vidé pour {package}",
   "clearAllCacheStatsContent": "Supprimer toutes les stats de cache des apps ?",
-  "cacheEntry": "{count} entrées · {package}"
+  "cacheEntry": "{count} entrées · {package}",
+  "modelHint": "Type a model id, or pick one after fetching",
+  "modelEmpty": "Model cannot be empty",
+  "modelsFetchFailed": "Failed to fetch models",
+  "modelsFetched": "Fetched {count} models",
+  "coverageTitle": "Coverage",
+  "hookLayout": "Layout text",
+  "hookLayoutDesc": "StaticLayout and BoringLayout, for text that never calls setText",
+  "hookWebView": "WebView",
+  "hookWebViewDesc": "Visible web page text. Inputs are skipped",
+  "hookCompose": "Compose text",
+  "hookComposeDesc": "Hooks Compose TextLayout / Paragraph when those classes exist",
+  "@modelsFetched": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  }
 }

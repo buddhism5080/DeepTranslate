@@ -8,8 +8,9 @@ import android.text.Spanned
 import android.text.style.*
 import android.widget.TextView
 import io.github.kirby.deeptranslate.xposed.ConfigManager
-import io.github.kirby.deeptranslate.xposed.LanguageDetector
 import io.github.kirby.deeptranslate.xposed.TextBatcher
+import io.github.kirby.deeptranslate.xposed.TextGate
+import io.github.kirby.deeptranslate.xposed.TranslationSession
 import io.github.libxposed.api.XposedModule
 import io.github.libxposed.api.XposedModuleInterface.PackageLoadedParam
 import java.lang.ref.WeakReference
@@ -27,7 +28,7 @@ object TextViewHook : BaseHook() {
             log(module, "translation disabled, skipping")
             return
         }
-        if (batcher == null) batcher = TextBatcher(module, param.packageName)
+        if (batcher == null) batcher = TranslationSession.batcher(module, param.packageName)
         hookSetTextMethods(module, param)
         log(module, "TextViewHook active for ${param.packageName}")
     }
@@ -124,7 +125,7 @@ object TextViewHook : BaseHook() {
 
                 if (chars != null && len > 0 && !isEditText(textView)) {
                     val textStr = String(chars, start, len)
-                    if (textStr.length >= 2 && LanguageDetector.needsTranslation(textStr, ConfigManager.getTargetLang())) {
+                    if (textStr.length >= 2 && TextGate.shouldTranslate(textStr)) {
                         val key = "${textView.hashCode()}_${textStr.hashCode()}"
                         if (pendingTexts.putIfAbsent(key, true) == null) {
                             val tvRef = WeakReference(textView)
@@ -277,7 +278,7 @@ object TextViewHook : BaseHook() {
         if (textStr.matches(Regex("^https?://.*"))) return false
         if (textStr.all { it.isDigit() || it.isWhitespace() }) return false
 
-        return LanguageDetector.needsTranslation(textStr, ConfigManager.getTargetLang())
+        return TextGate.shouldTranslate(textStr)
     }
 
     private fun isEditText(tv: TextView): Boolean = tv is android.widget.EditText

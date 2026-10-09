@@ -16,6 +16,9 @@ const kPrefBatchSize = 'pref_batch_size';
 const kPrefBatchWindowMs = 'pref_batch_window_ms';
 const kPrefCacheEnabled = 'pref_cache_enabled';
 const kPrefTranslateToast = 'pref_translate_toast';
+const kPrefHookLayout = 'pref_hook_layout';
+const kPrefHookWebView = 'pref_hook_webview';
+const kPrefHookCompose = 'pref_hook_compose';
 const kPrefAppWhitelist = 'pref_app_whitelist';
 const kPrefThemeMode = 'pref_theme_mode';
 const kPrefThemeSeedColor = 'pref_theme_seed_color';
@@ -23,7 +26,7 @@ const kPrefBlurBars = 'pref_blur_bars';
 const kPrefDebugLog = 'pref_debug_log';
 const kPrefOnboardingCompleted = 'pref_onboarding_completed';
 
-const kDefaultAiUrl = 'https://api.deepseek.com/v1/chat/completions';
+const kDefaultAiUrl = 'https://api.deepseek.com/v1';
 const kDefaultAiModel = 'deepseek-v4-flash';
 const kDefaultTargetLang = '中文';
 const kDefaultPrompt = '''你是一个专业翻译引擎。请将用户提供的文本翻译为中文。
@@ -65,6 +68,9 @@ class SettingsController extends ChangeNotifier {
   int batchWindowMs = 100;
   bool cacheEnabled = true;
   bool translateToast = true;
+  bool hookLayout = true;
+  bool hookWebView = true;
+  bool hookCompose = true;
   List<String> appWhitelist = [];
   ThemeMode themeMode = ThemeMode.system;
   int themeSeedColor = 0xFF6750A4;
@@ -97,6 +103,9 @@ class SettingsController extends ChangeNotifier {
     batchWindowMs = prefs.getInt(kPrefBatchWindowMs) ?? 100;
     cacheEnabled = prefs.getBool(kPrefCacheEnabled) ?? true;
     translateToast = prefs.getBool(kPrefTranslateToast) ?? true;
+    hookLayout = prefs.getBool(kPrefHookLayout) ?? true;
+    hookWebView = prefs.getBool(kPrefHookWebView) ?? true;
+    hookCompose = prefs.getBool(kPrefHookCompose) ?? true;
     appWhitelist = prefs.getStringList(kPrefAppWhitelist) ?? [];
     themeMode = ThemeMode.values[prefs.getInt(kPrefThemeMode) ?? 0];
     themeSeedColor = prefs.getInt(kPrefThemeSeedColor) ?? 0xFF6750A4;
@@ -212,6 +221,30 @@ class SettingsController extends ChangeNotifier {
     translateToast = value;
     final prefs = await _getPrefs();
     await prefs.setBool(kPrefTranslateToast, value);
+    notifyListeners();
+  }
+
+  Future<void> setHookLayout(bool value) async {
+    if (hookLayout == value) return;
+    hookLayout = value;
+    final prefs = await _getPrefs();
+    await prefs.setBool(kPrefHookLayout, value);
+    notifyListeners();
+  }
+
+  Future<void> setHookWebView(bool value) async {
+    if (hookWebView == value) return;
+    hookWebView = value;
+    final prefs = await _getPrefs();
+    await prefs.setBool(kPrefHookWebView, value);
+    notifyListeners();
+  }
+
+  Future<void> setHookCompose(bool value) async {
+    if (hookCompose == value) return;
+    hookCompose = value;
+    final prefs = await _getPrefs();
+    await prefs.setBool(kPrefHookCompose, value);
     notifyListeners();
   }
 

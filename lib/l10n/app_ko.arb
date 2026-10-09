@@ -21,7 +21,7 @@
   "cancel": "취소",
   "confirm": "확인",
   "usageNotes": "사용 방법",
-  "note1": "1. DeepSeek API 키 입력",
+  "note1": "1. Set an OpenAI-compatible API URL and model in Config",
   "note2": "2. LSPosed에서 모듈 활성화",
   "note3": "3. 대상 앱 재시작",
   "note4": "4. 번역 결과 캐시 저장",
@@ -36,7 +36,8 @@
   "clearAllCacheConfirm": "전체 삭제",
   "cacheManagement": "캐시 관리",
   "cachedCount": "{count}개 · 상세 보기",
-    "save": "저장", "configSaved": "저장됨",
+  "save": "저장",
+  "configSaved": "저장됨",
   "settings": "설정",
   "themeSystem": "시스템 따르기",
   "themeLight": "라이트",
@@ -44,9 +45,9 @@
   "cachedTranslations": "캐시된 번역",
   "clearCacheFailed": "삭제 실패",
   "appSubtitle": "LSPosed 전역 실시간 번역 모듈",
-  "engineDesc": "DeepSeek API (OpenAI 호환)",
-  "apiUrlHint": "https://api.deepseek.com/v1/chat/completions",
-  "apiKeyHint": "sk-xxxxxxxxxxxxxxxx",
+  "engineDesc": "OpenAI-compatible API",
+  "apiUrlHint": "https://api.deepseek.com/v1 or .../chat/completions",
+  "apiKeyHint": "optional for local servers",
   "timeoutSeconds": "{seconds}초",
   "temperatureDesc": "낮을수록 결정적, 높을수록 창의적",
   "maxTokensDesc": "최대 응답 길이",
@@ -57,7 +58,7 @@
   "batchWindowDesc": "더 많은 텍스트를 기다리는 시간(ms)",
   "translationCache": "번역 캐시",
   "translationCacheDesc": "번역을 로컬에 캐시하여 API 호출 중복 방지",
-  "deepseekInfo": "DeepSeek API는 OpenAI 프로토콜과 호환됩니다. 기본적으로 deepseek-chat 모델을 사용하며, 프롬프트 캐싱을 지원하여 반복 요청 비용을 줄입니다. 배치 모드는 같은 페이지의 여러 텍스트를 컨텍스트와 함께 집계하여 단어 단위 번역의 부자연스러움을 방지합니다.",
+  "deepseekInfo": "Any OpenAI-compatible API. Use a base URL (https://host/v1) or the full /chat/completions URL. Fetch models from /models, or type a model id. API key can be empty for local servers.",
   "promptHint": "탭하여 번역 프롬프트 편집...",
   "restoreDefault": "기본값 복원",
   "promptEditHint": "번역 프롬프트 입력...",
@@ -69,5 +70,23 @@
   "clearAppCacheContent": "{package}의 캐시 통계를 삭제하시겠습니까?",
   "appCacheCleared": "{package}의 캐시가 삭제되었습니다",
   "clearAllCacheStatsContent": "모든 앱의 캐시 통계를 삭제하시겠습니까?",
-  "cacheEntry": "{count}개 · {package}"
+  "cacheEntry": "{count}개 · {package}",
+  "modelHint": "Type a model id, or pick one after fetching",
+  "modelEmpty": "Model cannot be empty",
+  "modelsFetchFailed": "Failed to fetch models",
+  "modelsFetched": "Fetched {count} models",
+  "coverageTitle": "Coverage",
+  "hookLayout": "Layout text",
+  "hookLayoutDesc": "StaticLayout and BoringLayout, for text that never calls setText",
+  "hookWebView": "WebView",
+  "hookWebViewDesc": "Visible web page text. Inputs are skipped",
+  "hookCompose": "Compose text",
+  "hookComposeDesc": "Hooks Compose TextLayout / Paragraph when those classes exist",
+  "@modelsFetched": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  }
 }

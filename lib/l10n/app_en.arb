@@ -21,7 +21,7 @@
   "cancel": "Cancel",
   "confirm": "Confirm",
   "usageNotes": "Notes",
-  "note1": "1. Enter your DeepSeek API Key in Config",
+  "note1": "1. Set an OpenAI-compatible API URL and model in Config",
   "note2": "2. Enable the module in LSPosed, select target apps",
   "note3": "3. Restart target apps, text will auto-translate",
   "note4": "4. Translations are cached to avoid repeated API calls",
@@ -70,9 +70,9 @@
   "cachedTranslations": "Cached Translations",
   "clearCacheFailed": "Clear failed",
   "appSubtitle": "LSPosed Global Real-time Translation Module",
-  "engineDesc": "DeepSeek API (OpenAI Compatible)",
-  "apiUrlHint": "https://api.deepseek.com/v1/chat/completions",
-  "apiKeyHint": "sk-xxxxxxxxxxxxxxxx",
+  "engineDesc": "OpenAI-compatible API",
+  "apiUrlHint": "https://api.deepseek.com/v1 or .../chat/completions",
+  "apiKeyHint": "optional for local servers",
   "timeoutSeconds": "{seconds}s",
   "temperatureDesc": "Lower = more deterministic, higher = more creative",
   "maxTokensDesc": "Maximum response length",
@@ -83,7 +83,7 @@
   "batchWindowDesc": "Time to wait for more text (ms)",
   "translationCache": "Translation Cache",
   "translationCacheDesc": "Cache translations locally to avoid repeated API calls",
-  "deepseekInfo": "DeepSeek API is compatible with the OpenAI protocol. Uses the deepseek-chat model by default, supports prompt caching to reduce repeated request costs. Batch mode aggregates multiple texts from the same page with context to avoid word-by-word translation artifacts.",
+  "deepseekInfo": "Any OpenAI-compatible API. Use a base URL (https://host/v1) or the full /chat/completions URL. Fetch models from /models, or type a model id. API key can be empty for local servers.",
   "promptHint": "Tap to edit translation prompt...",
   "restoreDefault": "Restore Default",
   "promptEditHint": "Enter translation prompt...",
@@ -95,5 +95,23 @@
   "clearAppCacheContent": "Clear cache stats for {package}?",
   "appCacheCleared": "Cache cleared for {package}",
   "clearAllCacheStatsContent": "Clear all apps' cache stats?",
-  "cacheEntry": "{count} entries · {package}"
+  "cacheEntry": "{count} entries · {package}",
+  "modelHint": "Type a model id, or pick one after fetching",
+  "modelEmpty": "Model cannot be empty",
+  "modelsFetchFailed": "Failed to fetch models",
+  "modelsFetched": "Fetched {count} models",
+  "coverageTitle": "Coverage",
+  "hookLayout": "Layout text",
+  "hookLayoutDesc": "StaticLayout and BoringLayout, for text that never calls setText",
+  "hookWebView": "WebView",
+  "hookWebViewDesc": "Visible web page text. Inputs are skipped",
+  "hookCompose": "Compose text",
+  "hookComposeDesc": "Hooks Compose TextLayout / Paragraph when those classes exist",
+  "@modelsFetched": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  }
 }

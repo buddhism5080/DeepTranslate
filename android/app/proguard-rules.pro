@@ -4,3 +4,8 @@
 
 # Keep Xposed metadata
 -keep class META-INF.xposed.** { *; }
+
+-keepattributes RuntimeVisibleAnnotations,AnnotationDefault
+-keepclassmembers class io.github.kirby.deeptranslate.xposed.hook.WebViewHook$JsBridge {
+    @android.webkit.JavascriptInterface <methods>;
+}

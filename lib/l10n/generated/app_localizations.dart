@@ -685,6 +685,28 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{count} entries · {package}'**
   String cacheEntry(Object count, Object package);
+
+  String get modelHint;
+
+  String get modelEmpty;
+
+  String get modelsFetchFailed;
+
+  String modelsFetched(Object count);
+
+  String get coverageTitle;
+
+  String get hookLayout;
+
+  String get hookLayoutDesc;
+
+  String get hookWebView;
+
+  String get hookWebViewDesc;
+
+  String get hookCompose;
+
+  String get hookComposeDesc;
 }
 
 class _AppLocalizationsDelegate

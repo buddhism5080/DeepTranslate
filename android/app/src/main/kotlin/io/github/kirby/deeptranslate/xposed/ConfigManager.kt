@@ -94,7 +94,10 @@ object ConfigManager {
     // ── 便捷配置读取 ────────────────────────────────────────────────────────
 
     fun isTranslationEnabled(): Boolean = getBoolean("pref_translation_enabled", false)
-    fun getAiUrl(): String = getString("pref_ai_url", "https://api.deepseek.com/v1/chat/completions")
+    fun getAiUrl(): String = getString("pref_ai_url", "https://api.deepseek.com/v1")
+    fun isHookLayout(): Boolean = getBoolean("pref_hook_layout", true)
+    fun isHookWebView(): Boolean = getBoolean("pref_hook_webview", true)
+    fun isHookCompose(): Boolean = getBoolean("pref_hook_compose", true)
     fun getAiApiKey(): String = getString("pref_ai_api_key", "")
     fun getAiModel(): String = getString("pref_ai_model", "deepseek-v4-flash")
     fun getAiPrompt(): String = getString("pref_ai_prompt", "")
@@ -151,6 +154,7 @@ object ConfigManager {
         "pref_ai_timeout", "pref_ai_temperature", "pref_ai_max_tokens",
         "pref_batch_size", "pref_batch_window_ms", "pref_cache_enabled",
         "pref_translate_toast", "pref_app_whitelist",
+        "pref_hook_layout", "pref_hook_webview", "pref_hook_compose",
         "pref_theme_mode", "pref_theme_seed_color", "pref_blur_bars",
         "pref_debug_log", "pref_onboarding_completed"
     )

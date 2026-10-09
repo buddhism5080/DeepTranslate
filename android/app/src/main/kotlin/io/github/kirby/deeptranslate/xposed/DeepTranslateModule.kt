@@ -5,7 +5,9 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.util.Log
+import io.github.kirby.deeptranslate.xposed.hook.LayoutHook
 import io.github.kirby.deeptranslate.xposed.hook.TextViewHook
+import io.github.kirby.deeptranslate.xposed.hook.WebViewHook
 import io.github.libxposed.api.XposedModuleInterface.PackageLoadedParam
 import io.github.libxposed.api.XposedModule
 
@@ -53,7 +55,10 @@ class DeepTranslateModule : XposedModule() {
             log(Log.WARN, null, "failed to register cacheClearReceiver: ${e.message}")
         }
 
+        if (pkg == "io.github.kirby.deeptranslate") return
         TextViewHook.init(this, param)
+        LayoutHook.init(this, param)
+        WebViewHook.init(this, param)
     }
 
     private fun getContext(classLoader: ClassLoader): Context? {

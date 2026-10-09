@@ -36,7 +36,7 @@ class TextBatcher(
             }
         }
 
-        if (!LanguageDetector.needsTranslation(text, ConfigManager.getTargetLang())) {
+        if (!TextGate.shouldTranslate(text)) {
             mainHandler.post { onResult(text) }
             return
         }
@@ -88,6 +88,9 @@ class TextBatcher(
                 )
 
                 if (result.success) {
+                    for (entry in result.translations.values) {
+                        if (entry.translated != entry.original) TranslationCache.markOutput(entry.translated)
+                    }
                     if (ConfigManager.isCacheEnabled()) {
                         val entries = result.translations.values.map {
                             TranslationCache.CacheEntry(it.original, it.translated, it.sourceLang)

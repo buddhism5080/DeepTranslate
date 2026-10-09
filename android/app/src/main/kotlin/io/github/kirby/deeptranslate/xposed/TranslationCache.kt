@@ -6,17 +6,21 @@ import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 import android.util.Log
 import java.security.MessageDigest
+import java.util.Collections
+import java.util.LinkedHashMap
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * 翻译缓存。SQLite 持久化，key = SHA256(原文)。
- * 翻译过的文本下次直接命中缓存，零 API 调用、零延迟。
+ * 另有一张 outputs 表，记下译文本身，避免译文再次送去翻译。
  */
 object TranslationCache {
 
     private const val TAG = "DeepTranslate[Cache]"
     private const val DB_NAME = "deeptranslate_cache.db"
-    private const val DB_VERSION = 1
+    private const val DB_VERSION = 2
     private const val TABLE = "translations"
+    private const val OUTPUTS = "outputs"
     private const val COL_HASH = "text_hash"
     private const val COL_ORIGINAL = "original_text"
     private const val COL_TRANSLATED = "translated_text"
@@ -27,9 +31,15 @@ object TranslationCache {
     @Volatile private var dbHelper: DbHelper? = null
     @Volatile private var initialized = false
 
+    private val memory = Collections.synchronizedMap(object : LinkedHashMap<String, String>(256, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, String>?) = size > 400
+    })
+    private val knownOutputs = ConcurrentHashMap.newKeySet<String>()
+    private val knownNotOutputs = ConcurrentHashMap.newKeySet<String>()
+
     @Synchronized
     fun init(context: Context) {
-        if (initialized) return
+        if (initialized && dbHelper != null) return
         try {
             dbHelper = DbHelper(context.applicationContext)
             initialized = true
@@ -40,16 +50,25 @@ object TranslationCache {
         }
     }
 
-    private fun ensureInit(): Boolean {
-        if (!initialized) {
-            Log.w(TAG, "cache not initialized, skipping")
-            return false
-        }
+    fun ensureFromApp(): Boolean {
+        if (initialized && dbHelper != null) return true
+        val ctx = try {
+            val at = Class.forName("android.app.ActivityThread")
+            at.getMethod("currentApplication").invoke(null) as? Context
+        } catch (_: Throwable) {
+            null
+        } ?: return false
+        init(ctx)
         return dbHelper != null
     }
 
-    /** 查询缓存，命中返回译文，未命中返回 null。 */
+    private fun ensureInit(): Boolean {
+        if (!initialized || dbHelper == null) ensureFromApp()
+        return dbHelper != null
+    }
+
     fun get(original: String): String? {
+        memory[original]?.let { return it }
         if (!ensureInit()) return null
         return try {
             val hash = sha256(original)
@@ -62,7 +81,11 @@ object TranslationCache {
                 null, null, null
             )
             cursor.use {
-                if (it.moveToFirst()) it.getString(0) else null
+                if (it.moveToFirst()) {
+                    val translated = it.getString(0)
+                    memory[original] = translated
+                    translated
+                } else null
             }
         } catch (e: Exception) {
             Log.w(TAG, "get failed: ${e.message}")
@@ -70,8 +93,9 @@ object TranslationCache {
         }
     }
 
-    /** 写入缓存。 */
     fun put(original: String, translated: String, sourceLang: String, pkg: String) {
+        memory[original] = translated
+        if (translated != original) markOutput(translated)
         if (!ensureInit()) return
         try {
             val hash = sha256(original)
@@ -90,25 +114,23 @@ object TranslationCache {
         }
     }
 
-    /** 批量查询缓存，返回 Map<原文, 译文>（仅命中的）。 */
     fun getBatch(originals: List<String>): Map<String, String> {
-        if (!ensureInit() || originals.isEmpty()) return emptyMap()
+        if (originals.isEmpty()) return emptyMap()
         val result = mutableMapOf<String, String>()
-        try {
-            val db = dbHelper!!.readableDatabase
-            for (text in originals) {
-                val cached = get(text)
-                if (cached != null) result[text] = cached
-            }
-        } catch (e: Exception) {
-            Log.w(TAG, "getBatch failed: ${e.message}")
+        for (text in originals) {
+            val cached = get(text)
+            if (cached != null) result[text] = cached
         }
         return result
     }
 
-    /** 批量写入缓存。 */
     fun putBatch(entries: List<CacheEntry>, pkg: String) {
-        if (!ensureInit() || entries.isEmpty()) return
+        if (entries.isEmpty()) return
+        for (entry in entries) {
+            memory[entry.original] = entry.translated
+            if (entry.translated != entry.original) markOutput(entry.translated)
+        }
+        if (!ensureInit()) return
         try {
             val db = dbHelper!!.writableDatabase
             db.beginTransaction()
@@ -131,18 +153,56 @@ object TranslationCache {
         }
     }
 
-    /** 清空全部缓存。 */
-    fun clear() {
+    /** 译文本身。命中后不再送去翻译，避免布局刷新打成环。 */
+    fun isKnownOutput(text: String): Boolean {
+        if (text.isEmpty()) return false
+        val hash = sha256(text)
+        if (knownOutputs.contains(hash)) return true
+        if (knownNotOutputs.contains(hash)) return false
+        if (!ensureInit()) return false
+        return try {
+            val db = dbHelper!!.readableDatabase
+            val cursor = db.query(OUTPUTS, arrayOf(COL_HASH), "$COL_HASH = ?", arrayOf(hash), null, null, null)
+            val hit = cursor.use { it.moveToFirst() }
+            if (hit) knownOutputs.add(hash) else {
+                if (knownNotOutputs.size > 2000) knownNotOutputs.clear()
+                knownNotOutputs.add(hash)
+            }
+            hit
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    fun markOutput(text: String) {
+        if (text.isEmpty()) return
+        val hash = sha256(text)
+        knownNotOutputs.remove(hash)
+        knownOutputs.add(hash)
         if (!ensureInit()) return
         try {
-            dbHelper!!.writableDatabase.delete(TABLE, null, null)
+            val cv = ContentValues().apply { put(COL_HASH, hash) }
+            dbHelper!!.writableDatabase.insertWithOnConflict(OUTPUTS, null, cv, SQLiteDatabase.CONFLICT_IGNORE)
+        } catch (e: Exception) {
+            Log.w(TAG, "markOutput failed: ${e.message}")
+        }
+    }
+
+    fun clear() {
+        memory.clear()
+        knownOutputs.clear()
+        knownNotOutputs.clear()
+        if (!ensureInit()) return
+        try {
+            val db = dbHelper!!.writableDatabase
+            db.delete(TABLE, null, null)
+            db.delete(OUTPUTS, null, null)
             Log.d(TAG, "cache cleared")
         } catch (e: Exception) {
             Log.w(TAG, "clear failed: ${e.message}")
         }
     }
 
-    /** 缓存条目数。 */
     fun count(): Int {
         if (!ensureInit()) return 0
         return try {
@@ -179,11 +239,13 @@ object TranslationCache {
                 )
             """.trimIndent())
             db.execSQL("CREATE INDEX IF NOT EXISTS idx_pkg ON $TABLE($COL_PKG)")
+            db.execSQL("CREATE TABLE IF NOT EXISTS $OUTPUTS ($COL_HASH TEXT PRIMARY KEY)")
         }
 
         override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-            db.execSQL("DROP TABLE IF EXISTS $TABLE")
-            onCreate(db)
+            if (oldVersion < 2) {
+                db.execSQL("CREATE TABLE IF NOT EXISTS $OUTPUTS ($COL_HASH TEXT PRIMARY KEY)")
+            }
         }
     }
 }

@@ -30,7 +30,8 @@ object TranslationEngine {
     fun translateBatch(request: BatchRequest, module: XposedModule?): BatchResult {
         if (request.texts.isEmpty()) return BatchResult(emptyMap(), true)
 
-        val url = ConfigManager.getAiUrl()
+        val endpoints = OpenAiEndpoints.resolve(ConfigManager.getAiUrl())
+            ?: return BatchResult(emptyMap(), false, "API URL not configured")
         val apiKey = ConfigManager.getAiApiKey()
         val model = ConfigManager.getAiModel()
         val targetLang = ConfigManager.getTargetLang()
@@ -38,8 +39,7 @@ object TranslationEngine {
         val temperature = ConfigManager.getAiTemperature()
         val maxTokens = ConfigManager.getAiMaxTokens()
 
-        if (url.isEmpty()) return BatchResult(emptyMap(), false, "API URL not configured")
-        if (apiKey.isEmpty()) return BatchResult(emptyMap(), false, "API key not configured")
+        if (model.isBlank()) return BatchResult(emptyMap(), false, "model not configured")
 
         val prompt = buildPrompt(targetLang)
         val userContent = buildUserContent(request.texts)
@@ -49,14 +49,14 @@ object TranslationEngine {
 
         var connection: HttpURLConnection? = null
         try {
-            connection = (URL(url).openConnection() as HttpURLConnection).apply {
+            connection = (URL(endpoints.chat).openConnection() as HttpURLConnection).apply {
                 requestMethod = "POST"
                 connectTimeout = TimeUnit.SECONDS.toMillis(timeout.toLong()).toInt()
                 readTimeout = TimeUnit.SECONDS.toMillis(timeout.toLong()).toInt()
                 doOutput = true
                 setRequestProperty("Content-Type", "application/json")
                 setRequestProperty("Accept", "application/json")
-                setRequestProperty("Authorization", "Bearer $apiKey")
+                if (apiKey.isNotEmpty()) setRequestProperty("Authorization", "Bearer $apiKey")
             }
 
             OutputStreamWriter(connection.outputStream, Charsets.UTF_8).use { writer ->

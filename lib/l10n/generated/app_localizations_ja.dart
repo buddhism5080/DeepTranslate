@@ -72,7 +72,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get usageNotes => '使い方';
 
   @override
-  String get note1 => '1. 翻訳設定でDeepSeek APIキーを入力';
+  String get note1 => '1. Set an OpenAI-compatible API URL and model in Config';
 
   @override
   String get note2 => '2. LSPosedでモジュールを有効にし、対象アプリを選択';
@@ -221,13 +221,13 @@ class AppLocalizationsJa extends AppLocalizations {
   String get appSubtitle => 'LSPosed グローバルリアルタイム翻訳モジュール';
 
   @override
-  String get engineDesc => 'DeepSeek API (OpenAI互換)';
+  String get engineDesc => 'OpenAI-compatible API';
 
   @override
-  String get apiUrlHint => 'https://api.deepseek.com/v1/chat/completions';
+  String get apiUrlHint => 'https://api.deepseek.com/v1 or .../chat/completions';
 
   @override
-  String get apiKeyHint => 'sk-xxxxxxxxxxxxxxxx';
+  String get apiKeyHint => 'optional for local servers';
 
   @override
   String timeoutSeconds(Object seconds) {
@@ -262,8 +262,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get translationCacheDesc => '翻訳結果をローカルにキャッシュし、API呼び出しを繰り返さない';
 
   @override
-  String get deepseekInfo =>
-      'DeepSeek APIはOpenAIプロトコルと互換性があります。デフォルトではdeepseek-chatモデルを使用し、プロンプトキャッシングをサポートして繰り返しリクエストのコストを削減します。バッチモードは同じページの複数のテキストをコンテキストとともに集約し、単語単位の翻訳による不自然さを防ぎます。';
+  String get deepseekInfo => 'Any OpenAI-compatible API. Use a base URL (https://host/v1) or the full /chat/completions URL. Fetch models from /models, or type a model id. API key can be empty for local servers.';
 
   @override
   String get promptHint => 'タップして翻訳プロンプトを編集...';
@@ -305,5 +304,40 @@ class AppLocalizationsJa extends AppLocalizations {
   @override
   String cacheEntry(Object count, Object package) {
     return '$count 件 · $package';
+  }
+
+  @override
+  String get modelHint => 'Type a model id, or pick one after fetching';
+
+  @override
+  String get modelEmpty => 'Model cannot be empty';
+
+  @override
+  String get modelsFetchFailed => 'Failed to fetch models';
+
+  @override
+  String get coverageTitle => 'Coverage';
+
+  @override
+  String get hookLayout => 'Layout text';
+
+  @override
+  String get hookLayoutDesc => 'StaticLayout and BoringLayout, for text that never calls setText';
+
+  @override
+  String get hookWebView => 'WebView';
+
+  @override
+  String get hookWebViewDesc => 'Visible web page text. Inputs are skipped';
+
+  @override
+  String get hookCompose => 'Compose text';
+
+  @override
+  String get hookComposeDesc => 'Hooks Compose TextLayout / Paragraph when those classes exist';
+
+  @override
+  String modelsFetched(Object count) {
+    return 'Fetched $count models';
   }
 }
