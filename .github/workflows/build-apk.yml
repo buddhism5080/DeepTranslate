@@ -42,7 +42,10 @@ jobs:
             exit 1
           fi
           yes | "$sdkmanager" --licenses >/dev/null || true
-          "$sdkmanager" "platforms;android-37"
+          "$sdkmanager" "platforms;android-37.2" "build-tools;37.0.0"
+          if [ ! -e "$ANDROID_HOME/platforms/android-37" ]; then
+            ln -s android-37.2 "$ANDROID_HOME/platforms/android-37"
+          fi
           flutter config --android-sdk "$ANDROID_HOME"
 
       - name: Resolve dependencies
