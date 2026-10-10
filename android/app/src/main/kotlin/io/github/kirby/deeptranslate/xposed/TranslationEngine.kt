@@ -434,7 +434,7 @@ $base
                 setPackage("io.github.kirby.deeptranslate")
             }
             ctx.sendBroadcast(intent)
-            module.log(Log.INFO, TAG, "stats update sent: cached=$cached pkg=$pkg")
+            module?.log(Log.INFO, TAG, "stats update sent: cached=$cached pkg=$pkg")
 
             if (ConfigManager.isTranslateToast() && cached > 0) {
                 android.os.Handler(android.os.Looper.getMainLooper()).post {
