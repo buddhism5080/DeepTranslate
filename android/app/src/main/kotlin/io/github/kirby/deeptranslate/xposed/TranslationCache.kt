@@ -3,7 +3,6 @@ package io.github.kirby.deeptranslate.xposed
 import android.content.Context
 import android.content.Intent
 import android.database.sqlite.SQLiteDatabase
-import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.HandlerThread
@@ -27,7 +26,6 @@ object TranslationCache {
 
     private const val TAG = "DeepTranslate[Cache]"
     private const val LEGACY_DB = "deeptranslate_cache.db"
-    private val CACHE_URI: Uri = Uri.parse("content://io.github.kirby.deeptranslate.cache")
 
     @Volatile private var appContext: Context? = null
     @Volatile private var initialized = false
@@ -185,22 +183,17 @@ object TranslationCache {
         if (ctx == null) return null
         val token = ConfigManager.getBroadcastToken()
         if (token.isEmpty()) return null
-        val rows = extras.getString("rows")
-        val hash = extras.getString("hash")
-        val hashes = extras.getStringArrayList("hashes")
-        extras.putString("token", token)
-        extras.putString("package", ctx.packageName)
-        val direct = try {
-            ctx.contentResolver.call(CACHE_URI, method, null, extras)
-        } catch (e: Exception) {
-            Log.w(TAG, "$method provider failed: ${e.message}")
-            null
-        }
-        if (direct != null) return direct
-        return viaBroadcast(ctx, method, token, rows, hash, hashes)
+        return viaBroadcast(
+            ctx,
+            method,
+            token,
+            extras.getString("rows"),
+            extras.getString("hash"),
+            extras.getStringArrayList("hashes"),
+        )
     }
 
-    /** Error logs already arrive this way. The provider call does not, so the cache stayed empty. */
+    /** Read and write both use this. The provider call from the target app was not arriving. */
     private fun viaBroadcast(
         ctx: Context,
         method: String,
