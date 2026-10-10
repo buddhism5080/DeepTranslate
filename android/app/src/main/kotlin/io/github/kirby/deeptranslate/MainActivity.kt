@@ -88,14 +88,6 @@ class MainActivity : FlutterActivity() {
         return ModuleBroadcast.tokenMatches(intent, expected)
     }
 
-    private fun installed(pkg: String): Boolean =
-        try {
-            packageManager.getApplicationInfo(pkg, 0)
-            true
-        } catch (_: Exception) {
-            false
-        }
-
     /** 获取应用名和图标字节。 */
     private fun getAppInfo(pkg: String): Pair<String, ByteArray> {
         return try {
@@ -122,23 +114,7 @@ class MainActivity : FlutterActivity() {
         }
     }
 
-    /** 用 root 直接删除目标 App 的缓存数据库（最可靠，不依赖 App 是否在运行）。 */
-    private fun clearCacheWithRoot(pkg: String) {
-        val safe = safePackage(pkg) ?: return
-        if (!installed(safe)) return
-        Thread {
-            try {
-                val cmd = "rm -f /data/data/$safe/databases/deeptranslate_cache.db /data/data/$safe/databases/deeptranslate_cache.db-*"
-                val proc = Runtime.getRuntime().exec(arrayOf("su", "-c", cmd))
-                proc.waitFor()
-                Log.d(TAG, "root cache clear for $pkg: exit=${proc.exitValue()}")
-            } catch (e: Exception) {
-                Log.w(TAG, "root cache clear failed for $pkg: ${e.message}")
-            }
-        }.start()
-    }
-
-    /** 发送广播到目标 App 进程，让 Hook 清空 SQLite 缓存。 */
+    /** 让还在运行的目标进程丢掉内存里的旧结果。磁盘只在模块这边。 */
     private fun sendClearBroadcast(pkg: String) {
         val safe = safePackage(pkg) ?: return
         val intent = Intent("io.github.kirby.deeptranslate.CLEAR_CACHE").apply {
@@ -164,44 +140,22 @@ class MainActivity : FlutterActivity() {
                 }
 
                 "getCacheCount" -> {
-                    val prefs = getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
-                    result.success(prefs.getLong("flutter.pref_cache_count", 0L).toInt())
+                    result.success(ModuleCacheStore.count(this))
                 }
 
                 "getCacheDetails" -> {
-                    val prefs = getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
-                    val jsonStr = prefs.getString(CACHE_PREFS_KEY, "{}") ?: "{}"
-                    try {
-                        val jsonObj = JSONObject(jsonStr)
-                        val list = mutableListOf<Map<String, Any>>()
-                        for (key in jsonObj.keys()) {
-                            val count = jsonObj.getInt(key)
-                            val (appName, iconBytes) = getAppInfo(key)
-                            list.add(mapOf("package" to key, "count" to count, "name" to appName, "icon" to iconBytes))
-                        }
-                        result.success(list)
-                    } catch (e: Exception) {
-                        result.success(emptyList<Map<String, Any>>())
+                    val list = ModuleCacheStore.packages(this).map { (pkg, count) ->
+                        val (appName, iconBytes) = getAppInfo(pkg)
+                        mapOf("package" to pkg, "count" to count, "name" to appName, "icon" to iconBytes)
                     }
+                    result.success(list)
                 }
 
                 "clearAppCache" -> {
-                    val pkg = call.argument<String>("package") ?: ""
-                    if (pkg.isNotEmpty()) {
+                    val pkg = safePackage(call.argument<String>("package") ?: "")
+                    if (pkg != null) {
+                        ModuleCacheStore.clearPackage(this, pkg)
                         sendClearBroadcast(pkg)
-                        clearCacheWithRoot(pkg)
-                        // 清空本地统计
-                        val prefs = getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
-                        val jsonStr = prefs.getString(CACHE_PREFS_KEY, "{}") ?: "{}"
-                        try {
-                            val jsonObj = JSONObject(jsonStr)
-                            val removed = jsonObj.optInt(pkg, 0)
-                            jsonObj.remove(pkg)
-                            prefs.edit()
-                                .putString(CACHE_PREFS_KEY, jsonObj.toString())
-                                .putLong("flutter.pref_cache_count", maxOf(0L, prefs.getLong("flutter.pref_cache_count", 0L) - removed))
-                                .apply()
-                        } catch (_: Exception) {}
                         result.success(true)
                     } else {
                         result.success(false)
@@ -209,19 +163,9 @@ class MainActivity : FlutterActivity() {
                 }
 
                 "clearAllCache" -> {
-                    val prefs = getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
-                    val jsonStr = prefs.getString(CACHE_PREFS_KEY, "{}") ?: "{}"
-                    try {
-                        val jsonObj = JSONObject(jsonStr)
-                        for (key in jsonObj.keys()) {
-                            sendClearBroadcast(key)
-                            clearCacheWithRoot(key)
-                        }
-                    } catch (_: Exception) {}
-                    prefs.edit()
-                        .putString(CACHE_PREFS_KEY, "{}")
-                        .putLong("flutter.pref_cache_count", 0L)
-                        .apply()
+                    val pkgs = ModuleCacheStore.packages(this).map { it.first }
+                    for (pkg in pkgs) sendClearBroadcast(pkg)
+                    ModuleCacheStore.clearAll(this)
                     Toast.makeText(this, "已清空所有缓存", Toast.LENGTH_SHORT).show()
                     result.success(true)
                 }
@@ -269,25 +213,31 @@ class MainActivity : FlutterActivity() {
 
                 "listCacheRows" -> {
                     val pkg = safePackage(call.argument<String>("package") ?: "")
-                    if (pkg == null || !installed(pkg)) {
-                        result.success(emptyList<Map<String, Any>>())
-                    } else {
-                        result.success(CacheBrowser.list(this, pkg, call.argument<String>("query") ?: "") ?: emptyList<Map<String, Any>>())
-                    }
+                    if (pkg == null) result.success(emptyList<Map<String, Any>>())
+                    else result.success(ModuleCacheStore.list(this, pkg, call.argument<String>("query") ?: ""))
                 }
 
                 "getCacheRow" -> {
                     val pkg = safePackage(call.argument<String>("package") ?: "")
                     val hash = call.argument<String>("hash") ?: ""
-                    if (pkg == null || !installed(pkg)) result.success(null)
-                    else result.success(CacheBrowser.detail(this, pkg, hash))
+                    if (pkg == null || !hash.matches(Regex("^[0-9a-f]{64}$"))) result.success(null)
+                    else result.success(ModuleCacheStore.detail(this, pkg, hash))
                 }
 
                 "deleteCacheRows" -> {
                     val pkg = safePackage(call.argument<String>("package") ?: "")
-                    val hashes = call.argument<List<*>>("hashes")?.mapNotNull { it as? String } ?: emptyList()
-                    if (pkg == null || !installed(pkg)) result.success(false)
-                    else result.success(CacheBrowser.delete(this, pkg, hashes))
+                    val hashes = call.argument<List<*>>("hashes")?.mapNotNull { it as? String }
+                        ?.filter { it.matches(Regex("^[0-9a-f]{64}$")) } ?: emptyList()
+                    if (pkg == null || hashes.isEmpty()) result.success(false)
+                    else {
+                        ModuleCacheStore.delete(this, pkg, hashes)
+                        val intent = Intent("io.github.kirby.deeptranslate.DELETE_CACHE").apply {
+                            setPackage(pkg)
+                            putStringArrayListExtra("hashes", ArrayList(hashes))
+                        }
+                        sendBroadcast(intent)
+                        result.success(true)
+                    }
                 }
 
                 else -> result.notImplemented()

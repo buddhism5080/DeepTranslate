@@ -43,6 +43,10 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity-alias>
+        <provider
+            android:name=".CacheSyncProvider"
+            android:authorities="io.github.kirby.deeptranslate.cache"
+            android:exported="true" />
         <receiver
             android:name=".ErrorLogReceiver"
             android:exported="true">
