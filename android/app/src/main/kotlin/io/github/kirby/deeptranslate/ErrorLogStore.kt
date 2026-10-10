@@ -54,12 +54,30 @@ object ErrorLogStore {
                         "kind" to row.optString("kind"),
                         "status" to row.optInt("status"),
                         "message" to row.optString("message"),
-                        "request" to row.optString("request"),
-                        "response" to row.optString("response"),
                     )
                 )
             }
             return order.map { (pkg, entries) -> pkg to entries }
+        }
+    }
+
+    fun entry(context: Context, id: String): Map<String, Any>? {
+        synchronized(lock) {
+            val rows = readArray(context)
+            for (i in 0 until rows.length()) {
+                val row = rows.optJSONObject(i) ?: continue
+                if (row.optString("id") != id) continue
+                return mapOf(
+                    "id" to row.optString("id"),
+                    "time" to row.optLong("time"),
+                    "kind" to row.optString("kind"),
+                    "status" to row.optInt("status"),
+                    "message" to row.optString("message"),
+                    "request" to row.optString("request"),
+                    "response" to row.optString("response"),
+                )
+            }
+            return null
         }
     }
 

@@ -67,11 +67,11 @@ object TranslationCache {
         return dbHelper != null
     }
 
-    fun get(original: String): String? {
-        memory[scoped(original)]?.let { return it }
+    fun get(original: String, lang: String = ConfigManager.getTargetLang()): String? {
+        memory[scoped(original, lang)]?.let { return it }
         if (!ensureInit()) return null
         return try {
-            val hash = sha256(scoped(original))
+            val hash = sha256(scoped(original, lang))
             val db = dbHelper!!.readableDatabase
             val cursor = db.query(
                 TABLE,
@@ -83,7 +83,7 @@ object TranslationCache {
             cursor.use {
                 if (it.moveToFirst()) {
                     val translated = it.getString(0)
-                    memory[scoped(original)] = translated
+                    memory[scoped(original, lang)] = translated
                     translated
                 } else null
             }
@@ -93,12 +93,12 @@ object TranslationCache {
         }
     }
 
-    fun put(original: String, translated: String, sourceLang: String, pkg: String) {
-        memory[scoped(original)] = translated
-        if (translated != original) markOutput(translated)
+    fun put(original: String, translated: String, sourceLang: String, pkg: String, lang: String = ConfigManager.getTargetLang()) {
+        memory[scoped(original, lang)] = translated
+        if (translated != original) markOutput(translated, lang)
         if (!ensureInit()) return
         try {
-            val hash = sha256(scoped(original))
+            val hash = sha256(scoped(original, lang))
             val cv = ContentValues().apply {
                 put(COL_HASH, hash)
                 put(COL_ORIGINAL, original)
@@ -109,6 +109,7 @@ object TranslationCache {
             }
             val db = dbHelper!!.writableDatabase
             db.insertWithOnConflict(TABLE, null, cv, SQLiteDatabase.CONFLICT_REPLACE)
+            trim(db)
         } catch (e: Exception) {
             Log.w(TAG, "put failed: ${e.message}")
         }
@@ -146,6 +147,7 @@ object TranslationCache {
                 }
                 db.insertWithOnConflict(TABLE, null, cv, SQLiteDatabase.CONFLICT_REPLACE)
             }
+            trim(db)
             db.setTransactionSuccessful()
             db.endTransaction()
         } catch (e: Exception) {
@@ -153,10 +155,31 @@ object TranslationCache {
         }
     }
 
+    fun deleteHashes(hashes: Collection<String>) {
+        val safe = hashes.filter { it.length == 64 && it.all { ch -> ch in '0'..'9' || ch in 'a'..'f' } }
+        if (safe.isEmpty()) return
+        memory.clear()
+        if (!ensureInit()) return
+        try {
+            val marks = safe.joinToString(",") { "?" }
+            dbHelper!!.writableDatabase.delete(TABLE, "$COL_HASH IN ($marks)", safe.toTypedArray())
+        } catch (e: Exception) {
+            Log.w(TAG, "deleteHashes failed: ${e.message}")
+        }
+    }
+
+    private fun trim(db: SQLiteDatabase) {
+        val limit = ConfigManager.getCacheLimit()
+        db.execSQL(
+            "DELETE FROM $TABLE WHERE $COL_HASH NOT IN (" +
+                "SELECT $COL_HASH FROM $TABLE ORDER BY $COL_TIMESTAMP DESC LIMIT $limit)"
+        )
+    }
+
     /** 译文本身。命中后不再送去翻译，避免布局刷新打成环。 */
-    fun isKnownOutput(text: String): Boolean {
+    fun isKnownOutput(text: String, lang: String = ConfigManager.getTargetLang()): Boolean {
         if (text.isEmpty()) return false
-        val hash = sha256(scoped(text))
+        val hash = sha256(scoped(text, lang))
         if (knownOutputs.contains(hash)) return true
         if (knownNotOutputs.contains(hash)) return false
         if (!ensureInit()) return false
@@ -174,9 +197,9 @@ object TranslationCache {
         }
     }
 
-    fun markOutput(text: String) {
+    fun markOutput(text: String, lang: String = ConfigManager.getTargetLang()) {
         if (text.isEmpty()) return
-        val hash = sha256(scoped(text))
+        val hash = sha256(scoped(text, lang))
         knownNotOutputs.remove(hash)
         if (knownOutputs.size > 4000) knownOutputs.clear()
         knownOutputs.add(hash)
@@ -215,7 +238,8 @@ object TranslationCache {
         }
     }
 
-    private fun scoped(original: String) = ConfigManager.getTargetLang() + "\u0000" + original
+    private fun scoped(original: String, lang: String = ConfigManager.getTargetLang()) =
+        lang + "\u0000" + original
 
     private fun sha256(text: String): String {
         val md = MessageDigest.getInstance("SHA-256")

@@ -57,6 +57,7 @@ object TextViewHook : BaseHook() {
                         val tvRef = WeakReference(textView)
                         batcher?.submit(textStr, TextKinds.of(textStr, textView.javaClass.name, textView.maxLines)) { translated ->
                             release(key) {
+                                if (!ConfigManager.isTranslationEnabled()) return@release
                                 val tv = tvRef.get() ?: return@release
                                 if (tv.text?.toString() != textStr) return@release
                                 val saved = tv.text
@@ -91,6 +92,7 @@ object TextViewHook : BaseHook() {
                         val bufType = chain.args[1] as TextView.BufferType
                         batcher?.submit(textStr, TextKinds.of(textStr, textView.javaClass.name, textView.maxLines)) { translated ->
                             release(key) {
+                                if (!ConfigManager.isTranslationEnabled()) return@release
                                 val tv = tvRef.get() ?: return@release
                                 if (tv.text?.toString() != textStr) return@release
                                 val saved = tv.text
@@ -129,6 +131,7 @@ object TextViewHook : BaseHook() {
                             val tvRef = WeakReference(textView)
                             batcher?.submit(textStr, TextKinds.of(textStr, textView.javaClass.name, textView.maxLines)) { translated ->
                                 release(key) {
+                                    if (!ConfigManager.isTranslationEnabled()) return@release
                                     val tv = tvRef.get() ?: return@release
                                     if (tv.text?.toString() != textStr) return@release
                                     tv.text = translated
@@ -167,6 +170,7 @@ object TextViewHook : BaseHook() {
                 if (layout.lineCount > 0 && layout.getEllipsisCount(layout.lineCount - 1) > 0) {
                     val id = System.identityHashCode(tv)
                     abandoned.add(pendingKey(tv, originalText))
+                    LayoutHook.hold(originalText)
                     applying.add(id)
                     try {
                         tv.text = original
@@ -306,9 +310,11 @@ object TextViewHook : BaseHook() {
     private fun isPasswordField(tv: TextView): Boolean {
         return try {
             val type = tv.inputType
-            (type and android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD) != 0 ||
-            (type and android.text.InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD) != 0 ||
-            (type and android.text.InputType.TYPE_NUMBER_VARIATION_PASSWORD) != 0
+            val variation = type and android.text.InputType.TYPE_MASK_VARIATION
+            return variation == android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD ||
+                variation == android.text.InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD ||
+                variation == android.text.InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD ||
+                variation == android.text.InputType.TYPE_NUMBER_VARIATION_PASSWORD
         } catch (_: Exception) { false }
     }
 }

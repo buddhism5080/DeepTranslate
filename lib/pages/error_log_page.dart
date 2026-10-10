@@ -200,25 +200,27 @@ class _ErrorLogDetailState extends State<_ErrorLogDetail> {
     await _load();
   }
 
-  void _open(Map<String, dynamic> entry) {
+  Future<void> _open(Map<String, dynamic> entry) async {
     final l10n = AppLocalizations.of(context)!;
+    final full = await AppInfoService.getErrorLog(entry['id'] as String? ?? '') ?? entry;
+    if (!mounted) return;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(_title(l10n, entry)),
+        title: Text(_title(l10n, full)),
         content: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(entry['message'] as String? ?? ''),
+              Text(full['message'] as String? ?? ''),
               const SizedBox(height: 16),
               Text(l10n.errorRequest, style: Theme.of(ctx).textTheme.labelLarge),
               const SizedBox(height: 4),
-              SelectableText(entry['request'] as String? ?? ''),
+              SelectableText(full['request'] as String? ?? ''),
               const SizedBox(height: 16),
               Text(l10n.errorResponse, style: Theme.of(ctx).textTheme.labelLarge),
               const SizedBox(height: 4),
-              SelectableText(entry['response'] as String? ?? ''),
+              SelectableText(full['response'] as String? ?? ''),
             ],
           ),
         ),

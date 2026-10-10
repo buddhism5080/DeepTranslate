@@ -1,6 +1,7 @@
 package io.github.kirby.deeptranslate.xposed
 
 import android.util.Log
+import io.github.kirby.deeptranslate.ModuleBroadcast
 import io.github.libxposed.api.XposedModule
 import org.json.JSONArray
 import org.json.JSONObject
@@ -27,6 +28,7 @@ object TranslationEngine {
         val packageName: String,
         val scene: String = "content",
         val items: List<TranslateItem> = emptyList(),
+        val targetLang: String = "",
     )
 
     data class BatchResult(
@@ -55,6 +57,7 @@ object TranslationEngine {
         val items = request.items.ifEmpty { request.texts.map { TranslateItem(it) } }
             .filter { it.text.isNotEmpty() }
         if (items.isEmpty()) return BatchResult(emptyMap(), true)
+        val pinned = request.copy(targetLang = request.targetLang.ifBlank { ConfigManager.getTargetLang() })
 
         val primary = channel("primary", ConfigManager.getAiUrl(), ConfigManager.getAiApiKey(), ConfigManager.getAiModel())
         val fallback = channel(
@@ -70,7 +73,7 @@ object TranslationEngine {
         var pending = items.distinctBy { it.text }
         for (target in channels) {
             if (pending.isEmpty()) break
-            val got = drain(target, pending, request, module)
+            val got = drain(target, pending, pinned, module)
             done.putAll(got)
             pending = pending.filter { it.text !in done }
         }
@@ -96,7 +99,7 @@ object TranslationEngine {
     ): Map<String, TranslationEntry> {
         val done = linkedMapOf<String, TranslationEntry>()
         if (items.isEmpty()) return done
-        val first = requestOnce(target, items, request.scene, request.packageName, module)
+        val first = requestOnce(target, items, request.scene, request.packageName, request.targetLang, module)
         done.putAll(first.translated)
         if (first.authFailure) {
             module?.log(Log.WARN, TAG, "${target.name} rejected auth, switching channel")
@@ -114,7 +117,7 @@ object TranslationEngine {
             while (attempt < solos && item.text !in done) {
                 if (attempt > 0) pause(attempt)
                 attempt++
-                val call = requestOnce(target, listOf(item), request.scene, request.packageName, module)
+                val call = requestOnce(target, listOf(item), request.scene, request.packageName, request.targetLang, module)
                 if (call.authFailure) {
                     module?.log(Log.WARN, TAG, "${target.name} rejected auth, switching channel")
                     return done
@@ -138,11 +141,12 @@ object TranslationEngine {
         items: List<TranslateItem>,
         scene: String,
         packageName: String,
+        targetLang: String,
         module: XposedModule?,
     ): CallResult {
         val timeout = ConfigManager.getAiTimeout()
-        val prompt = buildPrompt(ConfigManager.getTargetLang(), scene)
-        val userContent = buildUserContent(scene, packageName, items)
+        val prompt = buildPrompt(targetLang, scene)
+        val userContent = buildUserContent(scene, packageName, items, targetLang)
         val body = buildRequestBody(
             target.model, prompt, userContent,
             ConfigManager.getAiTemperature(), ConfigManager.getAiMaxTokens(),
@@ -219,11 +223,11 @@ $base
         """.trimIndent()
     }
 
-    private fun buildUserContent(scene: String, packageName: String, items: List<TranslateItem>): String {
+    private fun buildUserContent(scene: String, packageName: String, items: List<TranslateItem>, targetLang: String): String {
         val root = JSONObject()
         root.put("scene", scene)
         root.put("app", packageName)
-        root.put("target", ConfigManager.getTargetLang())
+        root.put("target", targetLang)
         val arr = JSONArray()
         items.forEachIndexed { index, item ->
             val obj = JSONObject()
@@ -262,7 +266,7 @@ $base
                 ?.optJSONObject(0)
                 ?.optJSONObject("message")
                 ?: return result
-            val content = messageContent(message)
+            val content = stripOuterFence(messageContent(message))
             if (content.isBlank()) return result
             val arr = extractArray(content)
             if (arr == null) {
@@ -271,7 +275,7 @@ $base
                     if (objectText != null) {
                         result[originals[0]] = TranslationEntry(originals[0], objectText, "auto")
                     } else {
-                        val plain = content.replace("```json", "").replace("```", "").trim()
+                        val plain = content.trim()
                         if (plain.isNotEmpty() && '{' !in plain && '[' !in plain) {
                             result[originals[0]] = TranslationEntry(originals[0], plain, "auto")
                         }
@@ -294,14 +298,12 @@ $base
             }
             val n = originals.size
             val explicitIds = rows.filter { it.hasId && it.id >= 0 }.map { it.id }
-            val oneBased = explicitIds.isNotEmpty() &&
-                0 !in explicitIds &&
-                explicitIds.all { it in 1..n } &&
-                explicitIds.maxOrNull() == n
+            val oneBased = explicitIds.isNotEmpty() && explicitIds.toSet() == (1..n).toSet()
             val byId = mutableMapOf<Int, TranslationEntry>()
             for ((position, row) in rows.withIndex()) {
                 val index = when {
                     oneBased && row.hasId -> row.id - 1
+                    row.hasId && !oneBased && 0 !in explicitIds && explicitIds.all { it in 1..n } -> -1
                     row.hasId && row.id in originals.indices -> row.id
                     !row.hasId && explicitIds.isEmpty() && rows.size == n -> position
                     else -> -1
@@ -329,33 +331,58 @@ $base
         }
     }
 
-    private fun extractArray(content: String): JSONArray? {
-        val cleaned = content.replace("```json", "").replace("```", "").trim()
-        var from = 0
-        while (from < cleaned.length) {
-            val start = cleaned.indexOf('[', from)
-            if (start < 0) return null
-            val end = matchingBracket(cleaned, start) ?: return null
-            try {
-                return JSONArray(cleaned.substring(start, end + 1))
-            } catch (_: Exception) {
-                from = start + 1
-            }
+    private fun stripOuterFence(content: String): String {
+        val trimmed = content.trim()
+        if (!trimmed.startsWith("```")) return trimmed
+        val nl = trimmed.indexOf('\n')
+        if (nl < 0) return trimmed
+        var body = trimmed.substring(nl + 1)
+        if (body.trimEnd().endsWith("```")) {
+            body = body.trimEnd().removeSuffix("```")
         }
-        return null
+        return body.trim()
+    }
+
+    private fun extractArray(content: String): JSONArray? {
+        val start = topLevel(content, '[') ?: return null
+        if (content.substring(0, start).trimStart().startsWith("{")) return null
+        val end = matchingBracket(content, start) ?: return null
+        return try {
+            JSONArray(content.substring(start, end + 1))
+        } catch (_: Exception) {
+            null
+        }
     }
 
     private fun translationOfObject(content: String): String? {
-        val cleaned = content.replace("```json", "").replace("```", "").trim()
-        val start = cleaned.indexOf('{')
-        if (start < 0) return null
-        val end = matchingBrace(cleaned, start) ?: return null
+        val start = topLevel(content, '{') ?: return null
+        val end = matchingBrace(content, start) ?: return null
         return try {
-            val obj = JSONObject(cleaned.substring(start, end + 1))
+            val obj = JSONObject(content.substring(start, end + 1))
             obj.optString("translation", "").ifBlank { obj.optString("translated", "") }.ifBlank { null }
         } catch (_: Exception) {
             null
         }
+    }
+
+    private fun topLevel(text: String, open: Char): Int? {
+        var inString = false
+        var escaped = false
+        for (i in text.indices) {
+            val c = text[i]
+            if (inString) {
+                if (escaped) escaped = false
+                else if (c == '\\') escaped = true
+                else if (c == '"') inString = false
+                continue
+            }
+            if (c == '"') {
+                inString = true
+                continue
+            }
+            if (c == open) return i
+        }
+        return null
     }
 
     private fun matchingBracket(text: String, start: Int): Int? = matching(text, start, '[', ']')
@@ -404,14 +431,18 @@ $base
                 putExtra("kind", kind)
                 putExtra("status", status)
                 putExtra("message", message.take(500))
-                putExtra("request", request.take(6000))
-                putExtra("response", response.take(6000))
+                putExtra("request", redact(request).take(6000))
+                putExtra("response", redact(response).take(6000))
             }
-            ctx.sendBroadcast(intent)
+            ModuleBroadcast.send(ctx, intent, ConfigManager.getBroadcastToken())
         } catch (e: Exception) {
             module?.log(Log.WARN, TAG, "reportError failed: ${e.message}")
         }
     }
+
+    private fun redact(text: String): String =
+        text.replace(Regex("Bearer\\s+\\S+"), "Bearer [redacted]")
+            .replace(Regex("sk-[A-Za-z0-9_\\-]{8,}"), "sk-[redacted]")
 
     private fun appContext(module: XposedModule?): android.content.Context? {
         val m = module ?: return null
@@ -433,7 +464,7 @@ $base
                 putExtra("package", pkg)
                 setPackage("io.github.kirby.deeptranslate")
             }
-            ctx.sendBroadcast(intent)
+            ModuleBroadcast.send(ctx, intent, ConfigManager.getBroadcastToken())
             module?.log(Log.INFO, TAG, "stats update sent: cached=$cached pkg=$pkg")
 
             if (ConfigManager.isTranslateToast() && cached > 0) {

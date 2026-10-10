@@ -32,6 +32,9 @@ class XposedPrefsSyncApp : Application(), XposedServiceHelper.OnServiceListener 
         super.onCreate()
         XposedServiceHelper.registerListener(this)
         flutterPrefs.registerOnSharedPreferenceChangeListener(flutterPrefsListener)
+        if (flutterPrefs.getString("flutter.pref_broadcast_token", "").isNullOrEmpty()) {
+            flutterPrefs.edit().putString("flutter.pref_broadcast_token", java.util.UUID.randomUUID().toString()).apply()
+        }
     }
 
     override fun onTerminate() {
@@ -174,6 +177,8 @@ class XposedPrefsSyncApp : Application(), XposedServiceHelper.OnServiceListener 
             "pref_batch_size",
             "pref_batch_window_ms",
             "pref_cache_enabled",
+            "pref_cache_limit",
+            "pref_broadcast_token",
             "pref_concurrency",
             "pref_max_paragraphs",
             "pref_max_chars",

@@ -142,5 +142,12 @@
   "clearAllErrorsContent": "确定删除全部应用的错误日志？此操作不可撤销。",
   "errorsCleared": "错误日志已删除",
   "errorRequest": "请求",
-  "errorResponse": "响应"
+  "errorResponse": "响应",
+  "cacheLimit": "每个应用缓存上限",
+  "cacheLimitValue": "最多保留最新 {count} 条，多了丢掉最早的",
+  "cacheLimitHint": "100 到 100000",
+  "cacheSearch": "搜索原文或译文",
+  "cacheEmpty": "没有缓存",
+  "cacheOriginal": "原文",
+  "cacheTranslated": "译文"
 }

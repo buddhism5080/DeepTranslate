@@ -7,6 +7,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.EditText
 import android.widget.TextView
+import io.github.kirby.deeptranslate.xposed.hook.LayoutHook
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -62,10 +63,12 @@ object WindowRefresher {
     private fun applyToTree(view: View, batch: Map<String, String>) {
         if (view is TextView && view !is EditText && !isPassword(view)) {
             val current = view.text?.toString()
-            val displayed = current?.let { batch[it] }
-            if (displayed != null) {
-                DisplayText.remember(displayed)
-                view.text = displayed
+            if (current != null && !LayoutHook.isHeld(current)) {
+                val displayed = batch[current]
+                if (displayed != null) {
+                    DisplayText.remember(displayed)
+                    view.text = displayed
+                }
             }
         }
         view.forceLayout()
@@ -84,14 +87,14 @@ object WindowRefresher {
             variation == InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD
     }
 
-    /** Compose reuses a measured paragraph until the node is marked dirty. */
+    /** Compose keeps the paragraph it already measured. Mark the root dirty with the current method shape. */
     private fun dirtyCompose(view: View) {
         if (view.javaClass.name == "androidx.compose.ui.platform.AndroidComposeView") {
             val root = view.javaClass.declaredFields
                 .firstOrNull { it.name == "root" }
                 ?.also { it.isAccessible = true }
                 ?.get(view)
-            if (root != null) dirtyNode(root, 0)
+            if (root != null) remeasure(root)
             view.forceLayout()
         }
         if (view is ViewGroup) {
@@ -102,41 +105,17 @@ object WindowRefresher {
         }
     }
 
-    private fun dirtyNode(node: Any, depth: Int) {
-        if (depth > 80) return
-        val methods = node.javaClass.methods
-        val zero = methods.firstOrNull { it.name == "requestRemeasure" && it.parameterTypes.isEmpty() }
-        val one = methods.firstOrNull {
-            it.name == "requestRemeasure" &&
-                it.parameterTypes.size == 1 &&
-                it.parameterTypes[0] == Boolean::class.javaPrimitiveType
-        }
+    private fun remeasure(node: Any) {
+        val method = node.javaClass.methods.firstOrNull { it.name.startsWith("requestRemeasure") } ?: return
+        val booleans = method.parameterTypes.count { it == Boolean::class.javaPrimitiveType }
         try {
-            when {
-                zero != null -> zero.invoke(node)
-                one != null -> one.invoke(node, false)
+            when (booleans) {
+                0 -> method.invoke(node)
+                1 -> method.invoke(node, true)
+                2 -> method.invoke(node, true, true)
+                else -> method.invoke(node, true, true, true)
             }
         } catch (_: Throwable) {
-        }
-        for (child in childNodes(node)) dirtyNode(child, depth + 1)
-    }
-
-    private fun childNodes(node: Any): List<Any> {
-        val value = node.javaClass.methods
-            .firstOrNull { it.name == "getChildren" && it.parameterTypes.isEmpty() }
-            ?.invoke(node) ?: return emptyList()
-        if (value is Iterable<*>) return value.filterNotNull()
-        val size = value.javaClass.methods
-            .firstOrNull { it.name == "getSize" && it.parameterTypes.isEmpty() }
-            ?.invoke(value) as? Int ?: return emptyList()
-        val get = value.javaClass.methods.firstOrNull { it.name == "get" && it.parameterTypes.size == 1 }
-            ?: return emptyList()
-        return (0 until size).mapNotNull { index ->
-            try {
-                get.invoke(value, index)
-            } catch (_: Throwable) {
-                null
-            }
         }
     }
 }

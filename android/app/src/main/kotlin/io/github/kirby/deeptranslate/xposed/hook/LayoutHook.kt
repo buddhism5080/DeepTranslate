@@ -34,6 +34,13 @@ object LayoutHook : BaseHook() {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, String>?) = size > 400
     })
     private val inflight = ConcurrentHashMap.newKeySet<String>()
+    private val held = ConcurrentHashMap.newKeySet<String>()
+
+    fun hold(text: String) {
+        if (text.isNotEmpty()) held.add(text)
+    }
+
+    fun isHeld(text: String) = text in held
 
     override fun onInit(module: XposedModule, param: PackageLoadedParam) {
         val batcher = TranslationSession.batcher(module, param.packageName)
@@ -113,10 +120,12 @@ object LayoutHook : BaseHook() {
             val args = chain.args
             if (args.isEmpty()) return@intercept chain.proceed()
             val source = args[0] as? CharSequence ?: return@intercept chain.proceed()
+            if (source is android.text.Editable) return@intercept chain.proceed()
             val start = if (adjustRange && args.size >= 3 && args[1] is Int) args[1] as Int else 0
             val end = if (adjustRange && args.size >= 3 && args[2] is Int) args[2] as Int else source.length
             if (start < 0 || end > source.length || start >= end) return@intercept chain.proceed()
             val slice = source.subSequence(start, end).toString()
+            if (LayoutHook.isHeld(slice)) return@intercept chain.proceed()
             val key = "${ConfigManager.getTargetLang()}\u0000${ConfigManager.isBilingual()}\u0000$slice"
             // Span ranges on AndroidParagraphIntrinsics are indexes into the original string.
             if (executable.declaringClass.name.endsWith("AndroidParagraphIntrinsics")) {

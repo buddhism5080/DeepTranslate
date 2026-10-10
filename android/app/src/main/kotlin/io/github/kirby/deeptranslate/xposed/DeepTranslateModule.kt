@@ -21,6 +21,10 @@ class DeepTranslateModule : XposedModule() {
             try {
                 context?.let { ctx ->
                     TranslationCache.init(ctx)
+                    if (intent?.action == "io.github.kirby.deeptranslate.DELETE_CACHE") {
+                        TranslationCache.deleteHashes(intent.getStringArrayListExtra("hashes") ?: emptyList())
+                        return@let
+                    }
                     val before = TranslationCache.count()
                     TranslationCache.clear()
                     Log.d("DeepTranslate", "cache cleared: was $before entries")
@@ -29,7 +33,11 @@ class DeepTranslateModule : XposedModule() {
                         putExtra("package", context.packageName)
                         setPackage("io.github.kirby.deeptranslate")
                     }
-                    context.sendBroadcast(notifyIntent)
+                    io.github.kirby.deeptranslate.ModuleBroadcast.send(
+                        context,
+                        notifyIntent,
+                        ConfigManager.getBroadcastToken(),
+                    )
                 }
             } catch (e: Exception) {
                 Log.e("DeepTranslate", "cache clear failed: ${e.message}")
@@ -48,7 +56,9 @@ class DeepTranslateModule : XposedModule() {
             if (ctx != null) {
                 ctx.registerReceiver(
                     cacheClearReceiver,
-                    IntentFilter("io.github.kirby.deeptranslate.CLEAR_CACHE"),
+                    IntentFilter("io.github.kirby.deeptranslate.CLEAR_CACHE").apply {
+                        addAction("io.github.kirby.deeptranslate.DELETE_CACHE")
+                    },
                     "io.github.kirby.deeptranslate.permission.CACHE",
                     null,
                     Context.RECEIVER_EXPORTED,

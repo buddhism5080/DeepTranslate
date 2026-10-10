@@ -115,6 +115,10 @@ object ConfigManager {
     fun getFallbackApiKey(): String = getString("pref_fallback_api_key", "")
     fun getFallbackModel(): String = getString("pref_fallback_model", "")
     fun isBilingual(): Boolean = getBoolean("pref_bilingual", false)
+    fun getCacheLimit(): Int = getInt("pref_cache_limit", 10000).coerceIn(100, 100_000)
+
+    fun getBroadcastToken(): String = getString("pref_broadcast_token")
+
     fun isCacheEnabled(): Boolean = getBoolean("pref_cache_enabled", true)
     fun isTranslateToast(): Boolean = getBoolean("pref_translate_toast", true)
     fun getAppWhitelist(): Set<String> {
@@ -160,7 +164,7 @@ object ConfigManager {
         "pref_translation_enabled", "pref_ai_url", "pref_ai_api_key",
         "pref_ai_model", "pref_ai_prompt", "pref_ai_target_lang",
         "pref_ai_timeout", "pref_ai_temperature", "pref_ai_max_tokens",
-        "pref_batch_size", "pref_batch_window_ms", "pref_cache_enabled",
+        "pref_batch_size", "pref_batch_window_ms", "pref_cache_enabled", "pref_cache_limit", "pref_broadcast_token",
         "pref_concurrency", "pref_max_paragraphs", "pref_max_chars", "pref_bilingual",
         "pref_retry_count", "pref_fallback_url", "pref_fallback_api_key", "pref_fallback_model",
         "pref_translate_toast", "pref_app_whitelist",

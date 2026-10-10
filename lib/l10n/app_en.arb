@@ -143,6 +143,18 @@
   "errorsCleared": "Error log cleared",
   "errorRequest": "Request",
   "errorResponse": "Response",
+  "cacheLimit": "Per-app cache limit",
+  "cacheLimitValue": "Keep the newest {count} entries, then drop the oldest",
+  "cacheLimitHint": "100 to 100000",
+  "cacheSearch": "Search original or translation",
+  "cacheEmpty": "No cached entries",
+  "cacheOriginal": "Original",
+  "cacheTranslated": "Translation",
+  "@cacheLimitValue": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
   "@errorLogEntry": {
     "placeholders": {
       "count": { "type": "int" },

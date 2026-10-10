@@ -31,6 +31,19 @@ object WebViewHook : BaseHook() {
 
     override fun onInit(module: XposedModule, param: PackageLoadedParam) {
         val batcher = TranslationSession.batcher(module, param.packageName)
+        ConfigManager.addChangeListener {
+            val on = ConfigManager.isTranslationEnabled() && ConfigManager.isHookWebView()
+            val views = synchronized(bridged) { bridged.keys.toList() }
+            for (view in views) {
+                view.post {
+                    try {
+                        if (on) inject(view)
+                        else view.evaluateJavascript("window.__dtPaused=true; window.__dtAbort && window.__dtAbort();", null)
+                    } catch (_: Throwable) {
+                    }
+                }
+            }
+        }
         val loader = param.defaultClassLoader
         val webView = load(loader, "android.webkit.WebView") ?: return
 
@@ -130,7 +143,6 @@ object WebViewHook : BaseHook() {
 
         @JavascriptInterface
         fun offer(payload: String) {
-            if (!ConfigManager.isTranslationEnabled() || !ConfigManager.isHookWebView()) return
             val texts = try {
                 val arr = JSONArray(payload)
                 val collected = mutableListOf<String>()
@@ -141,6 +153,11 @@ object WebViewHook : BaseHook() {
                 }
                 collected
             } catch (_: Throwable) {
+                abort()
+                return
+            }
+            if (!ConfigManager.isTranslationEnabled() || !ConfigManager.isHookWebView()) {
+                finish(emptyMap(), texts)
                 return
             }
             if (texts.isEmpty()) return
@@ -153,8 +170,18 @@ object WebViewHook : BaseHook() {
             val translated = ConcurrentHashMap<String, String>()
             for (text in todo) {
                 batcher.submit(text, TextKinds.of(text)) { result ->
-                    if (result != text) translated[text] = result
+                    if (ConfigManager.isTranslationEnabled() && result != text) translated[text] = result
                     if (pending.decrementAndGet() == 0) finish(translated, texts)
+                }
+            }
+        }
+
+        private fun abort() {
+            val view = viewRef.get() ?: return
+            view.post {
+                try {
+                    view.evaluateJavascript("window.__dtAbort && window.__dtAbort()", null)
+                } catch (_: Throwable) {
                 }
             }
         }
@@ -177,7 +204,15 @@ object WebViewHook : BaseHook() {
     private val BOOT_SCRIPT = """
         (function(){
           function boot(){
-            if (window.__dtBooted || !document.body || !window.DeepTranslate) return;
+            if (!document.body || !window.DeepTranslate) return;
+            window.__dtPaused = false;
+            if (window.__dtBooted) { if (window.__dtCollect) window.__dtCollect(); return; }
+            window.__dtAbort = function(){
+              if (!document.body) return;
+              var walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null);
+              var n;
+              while ((n = walker.nextNode())) { n.__dtPending = false; }
+            };
             window.__dtBooted = true;
             function skip(el){
               if (!el) return true;
@@ -191,7 +226,7 @@ object WebViewHook : BaseHook() {
               return false;
             }
             function collect(){
-              if (!document.body || !window.DeepTranslate) return;
+              if (window.__dtPaused || !document.body || !window.DeepTranslate) return;
               var walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null);
               var batch = [];
               var n;
@@ -226,8 +261,6 @@ object WebViewHook : BaseHook() {
                   n.__dtPending = false;
                 } else if (settleSet[v]) {
                   n.__dtPending = false;
-                  n.__dtFail = (n.__dtFail || 0) + 1;
-                  if (n.__dtFail >= 2) n.__dtLock = true;
                 }
               }
               collect();
@@ -237,6 +270,7 @@ object WebViewHook : BaseHook() {
               if (timer) return;
               timer = setTimeout(function(){ timer = null; collect(); }, 150);
             }).observe(document.body, {subtree:true, childList:true, characterData:true});
+            window.__dtCollect = collect;
             collect();
           }
           boot();

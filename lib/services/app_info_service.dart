@@ -54,4 +54,27 @@ class AppInfoService {
     final r = await _channel.invokeMethod<bool>('clearErrorLogs', {'package': package ?? ''});
     return r ?? false;
   }
+
+  static Future<Map<String, dynamic>?> getErrorLog(String id) async {
+    final result = await _channel.invokeMethod<Map>('getErrorLog', {'id': id});
+    if (result == null) return null;
+    return Map<String, dynamic>.from(result);
+  }
+
+  static Future<List<Map<String, dynamic>>> listCacheRows(String package, String query) async {
+    final result = await _channel.invokeListMethod<Map>('listCacheRows', {'package': package, 'query': query});
+    if (result == null) return [];
+    return result.map((m) => Map<String, dynamic>.from(m)).toList();
+  }
+
+  static Future<Map<String, dynamic>?> getCacheRow(String package, String hash) async {
+    final result = await _channel.invokeMethod<Map>('getCacheRow', {'package': package, 'hash': hash});
+    if (result == null) return null;
+    return Map<String, dynamic>.from(result);
+  }
+
+  static Future<bool> deleteCacheRows(String package, List<String> hashes) async {
+    final r = await _channel.invokeMethod<bool>('deleteCacheRows', {'package': package, 'hashes': hashes});
+    return r ?? false;
+  }
 }

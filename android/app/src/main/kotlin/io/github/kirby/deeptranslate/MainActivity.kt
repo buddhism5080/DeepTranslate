@@ -33,6 +33,7 @@ class MainActivity : FlutterActivity() {
             val cached = intent?.getIntExtra("cached", 0) ?: 0
             val pkg = safePackage(intent?.getStringExtra("package") ?: "") ?: return
             if (cached !in 1..1000) return
+            if (!tokenOk(intent)) return
             if (!senderOwns(pkg)) return
             val prefs = getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
             try {
@@ -52,6 +53,7 @@ class MainActivity : FlutterActivity() {
     private val cacheClearedReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             val pkg = safePackage(intent?.getStringExtra("package") ?: "") ?: return
+            if (!tokenOk(intent)) return
             if (!senderOwns(pkg)) return
             val prefs = getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
             val jsonStr = prefs.getString(CACHE_PREFS_KEY, "{}") ?: "{}"
@@ -79,6 +81,20 @@ class MainActivity : FlutterActivity() {
         unregisterReceiver(cacheClearedReceiver)
         super.onDestroy()
     }
+
+    private fun tokenOk(intent: Intent?): Boolean {
+        val expected = getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
+            .getString("flutter.pref_broadcast_token", "") ?: ""
+        return ModuleBroadcast.tokenMatches(intent, expected)
+    }
+
+    private fun installed(pkg: String): Boolean =
+        try {
+            packageManager.getApplicationInfo(pkg, 0)
+            true
+        } catch (_: Exception) {
+            false
+        }
 
     /** 获取应用名和图标字节。 */
     private fun getAppInfo(pkg: String): Pair<String, ByteArray> {
@@ -109,6 +125,7 @@ class MainActivity : FlutterActivity() {
     /** 用 root 直接删除目标 App 的缓存数据库（最可靠，不依赖 App 是否在运行）。 */
     private fun clearCacheWithRoot(pkg: String) {
         val safe = safePackage(pkg) ?: return
+        if (!installed(safe)) return
         Thread {
             try {
                 val cmd = "rm -f /data/data/$safe/databases/deeptranslate_cache.db /data/data/$safe/databases/deeptranslate_cache.db-*"
@@ -232,8 +249,9 @@ class MainActivity : FlutterActivity() {
                 }
 
                 "clearErrorLogs" -> {
-                    val pkg = call.argument<String>("package")?.let { safePackage(it) }
-                    if (call.argument<String>("package").isNullOrEmpty()) {
+                    val raw = call.argument<String>("package")
+                    val pkg = raw?.let { safePackage(it) }
+                    if (raw.isNullOrEmpty()) {
                         ErrorLogStore.clear(this, null)
                         result.success(true)
                     } else if (pkg != null) {
@@ -242,6 +260,34 @@ class MainActivity : FlutterActivity() {
                     } else {
                         result.success(false)
                     }
+                }
+
+                "getErrorLog" -> {
+                    val id = call.argument<String>("id") ?: ""
+                    result.success(ErrorLogStore.entry(this, id))
+                }
+
+                "listCacheRows" -> {
+                    val pkg = safePackage(call.argument<String>("package") ?: "")
+                    if (pkg == null || !installed(pkg)) {
+                        result.success(emptyList<Map<String, Any>>())
+                    } else {
+                        result.success(CacheBrowser.list(this, pkg, call.argument<String>("query") ?: "") ?: emptyList<Map<String, Any>>())
+                    }
+                }
+
+                "getCacheRow" -> {
+                    val pkg = safePackage(call.argument<String>("package") ?: "")
+                    val hash = call.argument<String>("hash") ?: ""
+                    if (pkg == null || !installed(pkg)) result.success(null)
+                    else result.success(CacheBrowser.detail(this, pkg, hash))
+                }
+
+                "deleteCacheRows" -> {
+                    val pkg = safePackage(call.argument<String>("package") ?: "")
+                    val hashes = call.argument<List<*>>("hashes")?.mapNotNull { it as? String } ?: emptyList()
+                    if (pkg == null || !installed(pkg)) result.success(false)
+                    else result.success(CacheBrowser.delete(this, pkg, hashes))
                 }
 
                 else -> result.notImplemented()

@@ -23,6 +23,7 @@ const kPrefFallbackUrl = 'pref_fallback_url';
 const kPrefFallbackApiKey = 'pref_fallback_api_key';
 const kPrefFallbackModel = 'pref_fallback_model';
 const kPrefCacheEnabled = 'pref_cache_enabled';
+const kPrefCacheLimit = 'pref_cache_limit';
 const kPrefTranslateToast = 'pref_translate_toast';
 const kPrefHookLayout = 'pref_hook_layout';
 const kPrefHookWebView = 'pref_hook_webview';
@@ -83,6 +84,7 @@ class SettingsController extends ChangeNotifier {
   String fallbackApiKey = '';
   String fallbackModel = '';
   bool cacheEnabled = true;
+  int cacheLimit = 10000;
   bool translateToast = true;
   bool hookLayout = true;
   bool hookWebView = true;
@@ -126,6 +128,7 @@ class SettingsController extends ChangeNotifier {
     fallbackApiKey = prefs.getString(kPrefFallbackApiKey) ?? '';
     fallbackModel = prefs.getString(kPrefFallbackModel) ?? '';
     cacheEnabled = prefs.getBool(kPrefCacheEnabled) ?? true;
+    cacheLimit = prefs.getInt(kPrefCacheLimit) ?? 10000;
     translateToast = prefs.getBool(kPrefTranslateToast) ?? true;
     hookLayout = prefs.getBool(kPrefHookLayout) ?? true;
     hookWebView = prefs.getBool(kPrefHookWebView) ?? true;
@@ -301,6 +304,15 @@ class SettingsController extends ChangeNotifier {
     cacheEnabled = value;
     final prefs = await _getPrefs();
     await prefs.setBool(kPrefCacheEnabled, value);
+    notifyListeners();
+  }
+
+  Future<void> setCacheLimit(int value) async {
+    final next = value.clamp(100, 100000).toInt();
+    if (cacheLimit == next) return;
+    cacheLimit = next;
+    final prefs = await _getPrefs();
+    await prefs.setInt(kPrefCacheLimit, next);
     notifyListeners();
   }
 

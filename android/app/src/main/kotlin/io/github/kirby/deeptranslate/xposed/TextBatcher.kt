@@ -21,6 +21,7 @@ class TextBatcher(
     private class Job(
         val original: String,
         val kind: TextKind,
+        val lang: String,
         val chunks: List<String>,
         val translated: AtomicReferenceArray<String>,
         val left: AtomicInteger,
@@ -55,7 +56,7 @@ class TextBatcher(
         }
         if (ConfigManager.isCacheEnabled()) {
             getContext()?.let { TranslationCache.init(it) }
-            val cached = TranslationCache.get(text)
+            val cached = TranslationCache.get(text, ConfigManager.getTargetLang())
             if (cached != null) {
                 showOne(text, cached, kind, onResult)
                 return
@@ -86,7 +87,8 @@ class TextBatcher(
             TextChunks.splitDetailed(text, ConfigManager.getMaxChars(), ConfigManager.getMaxParagraphs())
         }
         val chunks = detailed.map { it.text }
-        val hits = if (ConfigManager.isCacheEnabled()) chunks.map { TranslationCache.get(it) } else chunks.map { null }
+        val lang = ConfigManager.getTargetLang()
+        val hits = if (ConfigManager.isCacheEnabled()) chunks.map { TranslationCache.get(it, lang) } else chunks.map { null }
         val refs = AtomicReferenceArray<String>(chunks.size)
         val missing = mutableListOf<Int>()
         for (i in chunks.indices) {
@@ -100,13 +102,13 @@ class TextBatcher(
         if (missing.isEmpty()) {
             val joined = buildString { for (i in chunks.indices) append(refs.get(i) ?: chunks[i]) }
             if (ConfigManager.isCacheEnabled() && joined != text) {
-                TranslationCache.put(text, joined, "cache", packageName)
+                TranslationCache.put(text, joined, "cache", packageName, lang)
             }
-            deliver(text, joined, kind, onResult)
+            deliver(text, joined, kind, lang, onResult)
             return
         }
 
-        val job = Job(text, kind, chunks, refs, AtomicInteger(missing.size), onResult)
+        val job = Job(text, kind, lang, chunks, refs, AtomicInteger(missing.size), onResult)
         val queue = if (kind == TextKind.UI) uiQueue else contentQueue
         for (i in missing) {
             queue.add(Work(
@@ -138,12 +140,20 @@ class TextBatcher(
         while (true) {
             val ui = takeBatch(uiQueue, partial) ?: break
             dispatched = true
-            exec.execute { runBatch(ui) }
+            try {
+                exec.execute { runBatch(ui) }
+            } catch (_: java.util.concurrent.RejectedExecutionException) {
+                for (work in ui) uiQueue.add(work)
+            }
         }
         while (true) {
             val content = takeBatch(contentQueue, partial) ?: break
             dispatched = true
-            exec.execute { runBatch(content) }
+            try {
+                exec.execute { runBatch(content) }
+            } catch (_: java.util.concurrent.RejectedExecutionException) {
+                for (work in content) contentQueue.add(work)
+            }
         }
         if (!dispatched && partial) return
         if (uiQueue.isNotEmpty() || contentQueue.isNotEmpty()) scheduleWindow()
@@ -179,8 +189,10 @@ class TextBatcher(
         if (!partial && !isFull(queue, maxWidgets, maxChars)) return null
         val batch = mutableListOf<Work>()
         var chars = 0
+        val lang = queue.peek()?.job?.lang
         while (batch.size < maxWidgets) {
             val next = queue.peek() ?: break
+            if (next.job.lang != lang) break
             if (batch.isNotEmpty() && chars + next.text.length > maxChars) break
             queue.poll()
             batch.add(next)
@@ -190,17 +202,23 @@ class TextBatcher(
     }
 
     private fun runBatch(batch: List<Work>) {
+        val finished = mutableSetOf<Work>()
+        try {
         val pending = mutableListOf<Work>()
         if (ConfigManager.isCacheEnabled()) getContext()?.let { TranslationCache.init(it) }
         for (work in batch) {
-            val hit = if (ConfigManager.isCacheEnabled()) TranslationCache.get(work.text) else null
-            if (hit != null) complete(work, hit, "cache") else pending.add(work)
+            val hit = if (ConfigManager.isCacheEnabled()) TranslationCache.get(work.text, work.job.lang) else null
+            if (hit != null) {
+                complete(work, hit, "cache")
+                finished.add(work)
+            } else pending.add(work)
         }
         if (pending.isEmpty()) return
         val result = TranslationEngine.translateBatch(
             TranslationEngine.BatchRequest(
                 packageName = packageName,
                 scene = if (pending.first().role == "ui") "ui" else "content",
+                targetLang = pending.first().job.lang,
                 items = pending.distinctBy { it.text }.map {
                     TranslationEngine.TranslateItem(
                         text = it.text,
@@ -219,7 +237,16 @@ class TextBatcher(
             val entry = byText[work.text]
             if (entry != null && entry.translated.isNotEmpty()) {
                 complete(work, entry.translated, entry.sourceLang)
+                finished.add(work)
             } else {
+                finished.add(work)
+                if (work.job.left.decrementAndGet() == 0) finish(work.job)
+            }
+        }
+        } catch (e: Exception) {
+            module?.log(Log.WARN, tag, "batch failed: ${e.message}")
+            for (work in batch) {
+                if (work in finished) continue
                 if (work.job.left.decrementAndGet() == 0) finish(work.job)
             }
         }
@@ -227,9 +254,9 @@ class TextBatcher(
 
     private fun complete(work: Work, translated: String, sourceLang: String) {
         if (ConfigManager.isCacheEnabled()) {
-            TranslationCache.put(work.text, translated, sourceLang, packageName)
+            TranslationCache.put(work.text, translated, sourceLang, packageName, work.job.lang)
         }
-        if (translated != work.text) TranslationCache.markOutput(translated)
+        if (translated != work.text) TranslationCache.markOutput(translated, work.job.lang)
         work.job.translated.set(work.index, translated)
         if (work.job.left.decrementAndGet() == 0) finish(work.job)
     }
@@ -241,41 +268,40 @@ class TextBatcher(
             for (i in job.chunks.indices) append(parts[i] ?: job.chunks[i])
         }
         if (complete && joined != job.original && ConfigManager.isCacheEnabled()) {
-            TranslationCache.put(job.original, joined, "auto", packageName)
+            TranslationCache.put(job.original, joined, "auto", packageName, job.lang)
         }
-        deliver(job.original, joined, job.kind, job.onResult)
+        deliver(job.original, joined, job.kind, job.lang, job.onResult)
     }
 
     private fun showOne(original: String, translated: String, kind: TextKind, onResult: (String) -> Unit) {
-        val shown = compose(original, translated, kind)
+        val shown = compose(original, translated, kind, ConfigManager.getTargetLang())
         mainHandler.post { onResult(shown) }
     }
 
-    private fun deliver(original: String, translated: String, kind: TextKind, onResult: (String) -> Unit) {
-        val shown = compose(original, translated, kind)
+    private fun deliver(original: String, translated: String, kind: TextKind, lang: String, onResult: (String) -> Unit) {
+        val shown = compose(original, translated, kind, lang)
         val callbacks = synchronized(waiting) { waiting.remove(original) }
         mainHandler.post {
             if (callbacks.isNullOrEmpty()) onResult(shown) else callbacks.forEach { it(shown) }
         }
     }
 
-    private fun compose(original: String, translated: String, kind: TextKind): String {
-        if (translated != original) TranslationCache.markOutput(translated)
+    private fun compose(original: String, translated: String, kind: TextKind, lang: String): String {
+        if (translated != original) TranslationCache.markOutput(translated, lang)
         val shown = DisplayText.present(original, translated, kind)
-        if (shown != translated) DisplayText.remember(shown)
+        if (shown != translated) TranslationCache.markOutput(shown, lang)
         return shown
     }
 
     private fun pool(): ExecutorService {
-        val want = ConfigManager.getConcurrency()
-        if (want == poolSize) return pool
         synchronized(this) {
-            val size = ConfigManager.getConcurrency()
-            if (size != poolSize) {
-                pool.shutdown()
-                pool = newPool(size)
-                poolSize = size
-                module?.log(Log.INFO, tag, "concurrency=$size")
+            val want = ConfigManager.getConcurrency()
+            if (want != poolSize) {
+                val old = pool
+                pool = newPool(want)
+                poolSize = want
+                old.shutdown()
+                module?.log(Log.INFO, tag, "concurrency=$want")
             }
             return pool
         }

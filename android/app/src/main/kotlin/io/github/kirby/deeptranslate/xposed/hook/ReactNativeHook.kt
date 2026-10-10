@@ -70,6 +70,7 @@ object ReactNativeHook : BaseHook() {
                 if (translated == original) return@submit
                 val target = ref.get() ?: return@submit
                 target.post {
+                    if (!ConfigManager.isTranslationEnabled()) return@post
                     try {
                         val current = readPrepared(target) ?: return@post
                         val currentText = textOf(current) ?: return@post
@@ -116,7 +117,7 @@ object ReactNativeHook : BaseHook() {
                 .setBreakStrategy(layout.breakStrategy)
                 .setHyphenationFrequency(layout.hyphenationFrequency)
                 .setJustificationMode(layout.justificationMode)
-            if (maxLines > 0) builder.setMaxLines(maxLines)
+            if (reported != null && reported > 0) builder.setMaxLines(reported)
             if (layout.lineCount > 0 && layout.getEllipsisCount(layout.lineCount - 1) > 0) {
                 builder.setEllipsize(TextUtils.TruncateAt.END).setEllipsizedWidth(width)
             }

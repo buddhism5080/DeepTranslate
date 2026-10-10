@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../services/app_info_service.dart';
 import '../widgets/blur_app_bar.dart';
+import 'cache_entries_page.dart';
 
 class CacheDetailPage extends StatefulWidget {
   const CacheDetailPage({super.key});
@@ -130,6 +131,14 @@ class _CacheDetailPageState extends State<CacheDetailPage> {
                               count: entry['count'] as int,
                               l10n: l10n,
                               onClear: () => _clearApp(entry['package'] as String),
+                              onOpen: () {
+                                Navigator.push(context, MaterialPageRoute(
+                                  builder: (_) => CacheEntriesPage(
+                                    packageName: entry['package'] as String,
+                                    appName: entry['name'] as String,
+                                  ),
+                                ));
+                              },
                               isFirst: index == 0,
                               isLast: index == _details.length - 1,
                             );
@@ -151,6 +160,7 @@ class _CacheAppTile extends StatelessWidget {
   final int count;
   final AppLocalizations l10n;
   final VoidCallback onClear;
+  final VoidCallback onOpen;
   final bool isFirst;
   final bool isLast;
 
@@ -161,6 +171,7 @@ class _CacheAppTile extends StatelessWidget {
     required this.count,
     required this.l10n,
     required this.onClear,
+    required this.onOpen,
     this.isFirst = false,
     this.isLast = false,
   });
@@ -202,6 +213,7 @@ class _CacheAppTile extends StatelessWidget {
           icon: Icon(Icons.delete_outline, color: cs.error.withValues(alpha: 0.7), size: 20),
           onPressed: onClear,
         ),
+        onTap: onOpen,
         shape: radius != null ? RoundedRectangleBorder(borderRadius: radius) : null,
         tileColor: cs.surfaceContainerHighest,
       ),

@@ -11,6 +11,9 @@ class ErrorLogReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val pkg = intent.getStringExtra("package") ?: return
         if (!packageNamePattern.matches(pkg)) return
+        val expected = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
+            .getString("flutter.pref_broadcast_token", "") ?: ""
+        if (!ModuleBroadcast.tokenMatches(intent, expected)) return
         if (android.os.Build.VERSION.SDK_INT >= 34 && sentFromPackage != pkg) return
         val kind = intent.getStringExtra("kind") ?: return
         if (kind !in setOf("network", "http", "parse")) return

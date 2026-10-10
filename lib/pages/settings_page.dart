@@ -36,6 +36,31 @@ class _SettingsPageState extends State<SettingsPage> {
     } catch (_) {}
   }
 
+  void _editCacheLimit() async {
+    final l10n = AppLocalizations.of(context)!;
+    final controller = TextEditingController(text: _ctrl.cacheLimit.toString());
+    final next = await showDialog<int>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.cacheLimit),
+        content: TextField(
+          controller: controller,
+          keyboardType: TextInputType.number,
+          decoration: InputDecoration(hintText: l10n.cacheLimitHint),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(l10n.cancel)),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, int.tryParse(controller.text.trim())),
+            child: Text(l10n.confirm),
+          ),
+        ],
+      ),
+    );
+    if (next == null) return;
+    await _ctrl.setCacheLimit(next);
+  }
+
   void _clearCache() async {
     final l10n = AppLocalizations.of(context)!;
     final confirmed = await showDialog<bool>(
@@ -240,6 +265,13 @@ class _SettingsPageState extends State<SettingsPage> {
                             MaterialPageRoute(builder: (_) => const CacheDetailPage()),
                           ).then((_) => _loadCacheCount());
                         },
+                      ),
+                      const Divider(height: 1, indent: 16, endIndent: 16),
+                      ListTile(
+                        leading: const Icon(Icons.filter_alt_outlined),
+                        title: Text(l10n.cacheLimit),
+                        subtitle: Text(l10n.cacheLimitValue(_ctrl.cacheLimit)),
+                        onTap: _editCacheLimit,
                       ),
                       const Divider(height: 1, indent: 16, endIndent: 16),
                       ListTile(
