@@ -127,5 +127,36 @@
   "fallbackUrl": "Fallback API URL",
   "fallbackModel": "Fallback model",
   "retryCount": "Retries",
-  "retryCountDesc": "Extra tries on the current channel before switching. 0 switches on the first error."
+  "retryCountDesc": "Extra tries on the current channel before switching. 0 switches on the first error.",
+  "errorLog": "Error log",
+  "errorLogDesc": "Network errors, non-200 responses, and replies that could not be parsed. Grouped by app.",
+  "noErrorLog": "No errors yet",
+  "errorLogEntry": "{count} entries · {package}",
+  "errorKindNetwork": "Network error",
+  "errorKindHttp": "HTTP {status}",
+  "errorKindParse": "Parse error",
+  "deleteSelected": "Delete selected",
+  "clearAppErrors": "Clear this app's log",
+  "clearAppErrorsContent": "Delete every error saved for {package}?",
+  "clearAllErrors": "Clear all error logs",
+  "clearAllErrorsContent": "Delete error logs for every app? This cannot be undone.",
+  "errorsCleared": "Error log cleared",
+  "errorRequest": "Request",
+  "errorResponse": "Response",
+  "@errorLogEntry": {
+    "placeholders": {
+      "count": { "type": "int" },
+      "package": { "type": "String" }
+    }
+  },
+  "@errorKindHttp": {
+    "placeholders": {
+      "status": { "type": "int" }
+    }
+  },
+  "@clearAppErrorsContent": {
+    "placeholders": {
+      "package": { "type": "String" }
+    }
+  }
 }

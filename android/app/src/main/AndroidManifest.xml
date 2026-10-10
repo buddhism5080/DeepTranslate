@@ -43,6 +43,13 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity-alias>
+        <receiver
+            android:name=".ErrorLogReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="io.github.kirby.deeptranslate.ERROR_LOG" />
+            </intent-filter>
+        </receiver>
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />

@@ -38,4 +38,20 @@ class AppInfoService {
     final r = await _channel.invokeMethod<bool>('clearAllCache');
     return r ?? false;
   }
+
+  static Future<List<Map<String, dynamic>>> listErrorLogs() async {
+    final result = await _channel.invokeListMethod<Map>('listErrorLogs');
+    if (result == null) return [];
+    return result.map((m) => Map<String, dynamic>.from(m)).toList();
+  }
+
+  static Future<bool> deleteErrorLogs(List<String> ids) async {
+    final r = await _channel.invokeMethod<bool>('deleteErrorLogs', {'ids': ids});
+    return r ?? false;
+  }
+
+  static Future<bool> clearErrorLogs([String? package]) async {
+    final r = await _channel.invokeMethod<bool>('clearErrorLogs', {'package': package ?? ''});
+    return r ?? false;
+  }
 }

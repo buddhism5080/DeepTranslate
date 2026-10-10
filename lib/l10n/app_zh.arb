@@ -127,5 +127,20 @@
   "fallbackUrl": "回退 API URL",
   "fallbackModel": "回退模型",
   "retryCount": "失败重试",
-  "retryCountDesc": "当前渠道出错后再试几次，然后才换回退。0 表示一失败就换。"
+  "retryCountDesc": "当前渠道出错后再试几次，然后才换回退。0 表示一失败就换。",
+  "errorLog": "错误日志",
+  "errorLogDesc": "网络错误、非 200，以及返回正常但解析不出译文。按应用查看。",
+  "noErrorLog": "暂无错误日志",
+  "errorLogEntry": "{count} 条 · {package}",
+  "errorKindNetwork": "网络错误",
+  "errorKindHttp": "HTTP {status}",
+  "errorKindParse": "解析失败",
+  "deleteSelected": "删除所选",
+  "clearAppErrors": "清空该应用日志",
+  "clearAppErrorsContent": "确定删除 {package} 的全部错误日志？",
+  "clearAllErrors": "清空所有错误日志",
+  "clearAllErrorsContent": "确定删除全部应用的错误日志？此操作不可撤销。",
+  "errorsCleared": "错误日志已删除",
+  "errorRequest": "请求",
+  "errorResponse": "响应"
 }

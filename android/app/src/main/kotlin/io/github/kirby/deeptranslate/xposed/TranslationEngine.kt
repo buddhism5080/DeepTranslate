@@ -172,14 +172,19 @@ object TranslationEngine {
             }
             if (responseCode !in 200..299) {
                 module?.log(Log.ERROR, TAG, "${target.name} HTTP $responseCode: ${responseBody.take(300)}")
+                reportError(module, packageName, "http", responseCode, "HTTP $responseCode", body, responseBody)
                 return CallResult(emptyMap(), responseCode, responseCode == 401 || responseCode == 403)
             }
             val translations = parseResponse(responseBody, items.map { it.text })
+            if (translations.isEmpty() && items.isNotEmpty()) {
+                reportError(module, packageName, "parse", responseCode, "响应无法解析成译文", body, responseBody)
+            }
             module?.log(Log.INFO, TAG, "${target.name} parsed ${translations.size}/${items.size}")
             sendStatsUpdate(module, translations.size, packageName)
             return CallResult(translations, responseCode, false)
         } catch (e: Exception) {
             module?.log(Log.ERROR, TAG, "${target.name} failed: ${e.message}")
+            reportError(module, packageName, "network", 0, e.message ?: e.javaClass.simpleName, body, "")
             return CallResult(emptyMap(), 0, false)
         } finally {
             connection?.disconnect()
@@ -381,14 +386,47 @@ $base
         return null
     }
 
+    /** 网络错误、非 200、以及 200 但解析不出译文，都送到配置 App。不含 API Key。 */
+    private fun reportError(
+        module: XposedModule?,
+        pkg: String,
+        kind: String,
+        status: Int,
+        message: String,
+        request: String,
+        response: String,
+    ) {
+        try {
+            val ctx = appContext(module) ?: return
+            val intent = android.content.Intent("io.github.kirby.deeptranslate.ERROR_LOG").apply {
+                setPackage("io.github.kirby.deeptranslate")
+                putExtra("package", pkg)
+                putExtra("kind", kind)
+                putExtra("status", status)
+                putExtra("message", message.take(500))
+                putExtra("request", request.take(6000))
+                putExtra("response", response.take(6000))
+            }
+            ctx.sendBroadcast(intent)
+        } catch (e: Exception) {
+            module?.log(Log.WARN, TAG, "reportError failed: ${e.message}")
+        }
+    }
+
+    private fun appContext(module: XposedModule?): android.content.Context? {
+        val m = module ?: return null
+        return try {
+            val at = Class.forName("android.app.ActivityThread", false, m.javaClass.classLoader)
+            at.getMethod("currentApplication").invoke(null) as? android.content.Context
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     /** 通知配置 App 这次新缓存了多少条。 */
     private fun sendStatsUpdate(module: XposedModule?, cached: Int, pkg: String) {
         try {
-            val ctx = module?.let { m ->
-                val cl = m.javaClass.classLoader
-                val at = Class.forName("android.app.ActivityThread", false, cl)
-                (at.getMethod("currentApplication").invoke(null) as? android.content.Context)
-            } ?: return
+            val ctx = appContext(module) ?: return
 
             val intent = android.content.Intent("io.github.kirby.deeptranslate.TOKEN_UPDATE").apply {
                 putExtra("cached", cached)

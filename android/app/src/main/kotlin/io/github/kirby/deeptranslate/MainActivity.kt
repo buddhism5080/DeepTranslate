@@ -217,6 +217,33 @@ class MainActivity : FlutterActivity() {
 
                 "getBuildTime" -> { result.success(BuildConfig.BUILD_TIME) }
 
+                "listErrorLogs" -> {
+                    val list = ErrorLogStore.grouped(this).map { (pkg, entries) ->
+                        val (appName, iconBytes) = getAppInfo(pkg)
+                        mapOf("package" to pkg, "name" to appName, "icon" to iconBytes, "entries" to entries)
+                    }
+                    result.success(list)
+                }
+
+                "deleteErrorLogs" -> {
+                    val ids = call.argument<List<*>>("ids")?.mapNotNull { it as? String }?.toSet() ?: emptySet()
+                    ErrorLogStore.delete(this, ids)
+                    result.success(true)
+                }
+
+                "clearErrorLogs" -> {
+                    val pkg = call.argument<String>("package")?.let { safePackage(it) }
+                    if (call.argument<String>("package").isNullOrEmpty()) {
+                        ErrorLogStore.clear(this, null)
+                        result.success(true)
+                    } else if (pkg != null) {
+                        ErrorLogStore.clear(this, pkg)
+                        result.success(true)
+                    } else {
+                        result.success(false)
+                    }
+                }
+
                 else -> result.notImplemented()
             }
         }

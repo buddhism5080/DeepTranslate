@@ -5,6 +5,7 @@ import '../services/app_info_service.dart';
 import '../widgets/blur_app_bar.dart';
 import '../widgets/section_label.dart';
 import 'cache_detail_page.dart';
+import 'error_log_page.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -250,6 +251,23 @@ class _SettingsPageState extends State<SettingsPage> {
                         onTap: _clearCache,
                       ),
                     ],
+                  ),
+                ),
+                const SizedBox(height: 8),
+
+                SectionLabel(l10n.errorLog),
+                const SizedBox(height: 8),
+                Card(
+                  elevation: 0,
+                  color: cs.surfaceContainerHighest,
+                  child: ListTile(
+                    leading: const Icon(Icons.error_outline),
+                    title: Text(l10n.errorLog),
+                    subtitle: Text(l10n.errorLogDesc),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () {
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const ErrorLogPage()));
+                    },
                   ),
                 ),
                 const SizedBox(height: 8),
