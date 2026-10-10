@@ -263,7 +263,6 @@ class _SettingsPageState extends State<SettingsPage> {
                   child: ListTile(
                     leading: const Icon(Icons.error_outline),
                     title: Text(l10n.errorLog),
-                    subtitle: Text(l10n.errorLogDesc),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () {
                       Navigator.push(context, MaterialPageRoute(builder: (_) => const ErrorLogPage()));

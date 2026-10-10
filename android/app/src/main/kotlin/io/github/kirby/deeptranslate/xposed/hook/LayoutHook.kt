@@ -145,10 +145,8 @@ object LayoutHook : BaseHook() {
 
             batcher.submit(slice, kind) { translated ->
                 inflight.remove(key)
-                val displayed = DisplayText.present(slice, translated, kind)
-                DisplayText.remember(displayed)
-                shown[key] = displayed
-                if (displayed != slice) WindowRefresher.schedule(slice, displayed)
+                shown[key] = translated
+                if (translated != slice) WindowRefresher.schedule(slice, translated)
             }
             chain.proceed()
         }
