@@ -47,6 +47,7 @@ object TranslationEngine {
         val model: String,
         val connectMs: Int,
         val readMs: Int,
+        val retries: Int,
     )
 
     private data class ParsedLine(val id: Int, val hasId: Boolean, val translation: String, val lang: String)
@@ -74,6 +75,7 @@ object TranslationEngine {
             ConfigManager.getAiModel(),
             ConfigManager.getAiConnectTimeout(),
             ConfigManager.getAiReadTimeout(),
+            ConfigManager.getRetryCount(),
         )
         val fallback = channel(
             "fallback",
@@ -82,6 +84,7 @@ object TranslationEngine {
             ConfigManager.getFallbackModel(),
             ConfigManager.getFallbackConnectTimeout(),
             ConfigManager.getFallbackReadTimeout(),
+            ConfigManager.getFallbackRetryCount(),
         )
         val channels = listOfNotNull(primary, fallback)
         if (channels.isEmpty()) return BatchResult(emptyMap(), false, "API URL not configured")
@@ -110,6 +113,7 @@ object TranslationEngine {
         model: String,
         connectSeconds: Int,
         readSeconds: Int,
+        retries: Int,
     ): Channel? {
         if (model.isBlank()) return null
         val endpoints = OpenAiEndpoints.resolve(url) ?: return null
@@ -120,13 +124,14 @@ object TranslationEngine {
             model,
             connectSeconds.coerceIn(1, 60) * 1000,
             readSeconds.coerceIn(1, 180) * 1000,
+            retries.coerceIn(0, 10),
         )
     }
 
     /**
-     * Retry the lines still missing, with backoff between tries.
-     * [ConfigManager.getRetryCount] is how many retries this channel gets.
-     * When they are used up the caller clears backoff and moves to the fallback channel.
+     * Retry the lines still missing, with the shared backoff between tries.
+     * [Channel.retries] is this channel's own limit. The caller clears backoff
+     * before the next channel, so the fallback channel starts from the base delay.
      */
     private fun drain(
         target: Channel,
@@ -137,7 +142,7 @@ object TranslationEngine {
     ): Map<String, TranslationEntry> {
         val done = linkedMapOf<String, TranslationEntry>()
         if (items.isEmpty()) return done
-        val limit = ConfigManager.getRetryCount()
+        val limit = target.retries
         var pending = items
         var tries = 0
         while (pending.isNotEmpty()) {

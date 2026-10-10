@@ -116,7 +116,8 @@ object ConfigManager {
     fun getConcurrency(): Int = getInt("pref_concurrency", 3).coerceIn(1, 8)
     fun getMaxParagraphs(): Int = getInt("pref_max_paragraphs", 6).coerceIn(1, 16)
     fun getMaxChars(): Int = getInt("pref_max_chars", 1800).coerceIn(400, 8000)
-    fun getRetryCount(): Int = getInt("pref_retry_count", 1).coerceIn(0, 3)
+    fun getRetryCount(): Int = getInt("pref_retry_count", 1).coerceIn(0, 10)
+    fun getFallbackRetryCount(): Int = getInt("pref_fallback_retry_count", getRetryCount()).coerceIn(0, 10)
     fun getFallbackUrl(): String = getString("pref_fallback_url", "")
     fun getFallbackApiKey(): String = getString("pref_fallback_api_key", "")
     fun getFallbackModel(): String = getString("pref_fallback_model", "")
@@ -175,7 +176,7 @@ object ConfigManager {
         "pref_ai_temperature", "pref_ai_max_tokens",
         "pref_batch_size", "pref_batch_window_ms", "pref_cache_enabled", "pref_cache_limit", "pref_broadcast_token",
         "pref_concurrency", "pref_max_paragraphs", "pref_max_chars", "pref_bilingual",
-        "pref_retry_count", "pref_fallback_url", "pref_fallback_api_key", "pref_fallback_model",
+        "pref_retry_count", "pref_fallback_retry_count", "pref_fallback_url", "pref_fallback_api_key", "pref_fallback_model",
         "pref_translate_toast", "pref_app_whitelist",
         "pref_hook_layout", "pref_hook_webview", "pref_hook_compose",
         "pref_theme_mode", "pref_theme_seed_color", "pref_blur_bars",

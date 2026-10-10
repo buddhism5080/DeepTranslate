@@ -50,6 +50,7 @@ class _AiConfigPageState extends State<AiConfigPage> {
   late int _maxParagraphsDraft;
   late int _maxCharsDraft;
   late int _retryDraft;
+  late int _fbRetryDraft;
 
   @override
   void initState() {
@@ -76,6 +77,7 @@ class _AiConfigPageState extends State<AiConfigPage> {
     _maxParagraphsDraft = _ctrl.maxParagraphs.clamp(1, 16).toInt();
     _maxCharsDraft = _ctrl.maxChars.clamp(400, 8000).toInt();
     _retryDraft = _ctrl.retryCount;
+    _fbRetryDraft = _ctrl.fallbackRetryCount;
   }
 
   void _onCtrlChanged() {
@@ -186,6 +188,7 @@ class _AiConfigPageState extends State<AiConfigPage> {
     await _ctrl.setReadTimeout(_readDraft);
     await _ctrl.setAiTemperature(_aiTemperatureDraft);
     await _ctrl.setAiMaxTokens(_aiMaxTokensDraft);
+    await _ctrl.setRetryCount(_retryDraft);
     _toastSaved();
   }
 
@@ -195,6 +198,11 @@ class _AiConfigPageState extends State<AiConfigPage> {
     await _ctrl.setFallbackModel(_fbModelCtrl.text.trim());
     await _ctrl.setFallbackConnectTimeout(_fbConnectDraft);
     await _ctrl.setFallbackReadTimeout(_fbReadDraft);
+    await _ctrl.setFallbackRetryCount(_fbRetryDraft);
+    _toastSaved();
+  }
+
+  Future<void> _saveBackoff() async {
     await _ctrl.setBackoffBaseMs(_backoffBaseDraft);
     await _ctrl.setBackoffMaxMs(_backoffMaxDraft);
     await _ctrl.setRetryCount(_retryDraft);
@@ -532,6 +540,17 @@ class _AiConfigPageState extends State<AiConfigPage> {
                           ),
                         ),
 
+                        _limitSlider(
+                          icon: const Icon(Icons.replay, size: 18),
+                          title: l10n.retryCount,
+                          subtitle: l10n.retryCountDesc,
+                          valueLabel: '$_retryDraft',
+                          value: _retryDraft.toDouble(),
+                          min: 0,
+                          max: 10,
+                          divisions: 10,
+                          onChanged: (v) => setState(() => _retryDraft = v.round()),
+                        ),
                         const SizedBox(height: 24),
                         _saveButton(() { _saveApi(); }),
                       ],
@@ -606,6 +625,35 @@ class _AiConfigPageState extends State<AiConfigPage> {
                           onChanged: (v) => setState(() => _fbReadDraft = v.round()),
                         ),
                         _limitSlider(
+                          icon: const Icon(Icons.replay, size: 18),
+                          title: l10n.fallbackRetryCount,
+                          subtitle: l10n.fallbackRetryCountDesc,
+                          valueLabel: '$_fbRetryDraft',
+                          value: _fbRetryDraft.toDouble(),
+                          min: 0,
+                          max: 10,
+                          divisions: 10,
+                          onChanged: (v) => setState(() => _fbRetryDraft = v.round()),
+                        ),
+                        const SizedBox(height: 16),
+                        _saveButton(() { _saveFallback(); }),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                SectionLabel(l10n.backoffTitle),
+                const SizedBox(height: 8),
+                Card(
+                  elevation: 0,
+                  color: cs.surfaceContainerHighest,
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _limitSlider(
                           icon: const Icon(Icons.timer_outlined, size: 18),
                           title: l10n.backoffBase,
                           subtitle: l10n.backoffBaseDesc,
@@ -627,19 +675,8 @@ class _AiConfigPageState extends State<AiConfigPage> {
                           divisions: 58,
                           onChanged: (v) => setState(() => _backoffMaxDraft = (v / 500).round() * 500),
                         ),
-                        _limitSlider(
-                          icon: const Icon(Icons.replay, size: 18),
-                          title: l10n.retryCount,
-                          subtitle: l10n.retryCountDesc,
-                          valueLabel: '$_retryDraft',
-                          value: _retryDraft.toDouble(),
-                          min: 0,
-                          max: 3,
-                          divisions: 3,
-                          onChanged: (v) => setState(() => _retryDraft = v.round()),
-                        ),
                         const SizedBox(height: 16),
-                        _saveButton(() { _saveFallback(); }),
+                        _saveButton(() { _saveBackoff(); }),
                       ],
                     ),
                   ),

@@ -25,6 +25,7 @@ const kPrefMaxParagraphs = 'pref_max_paragraphs';
 const kPrefMaxChars = 'pref_max_chars';
 const kPrefBilingual = 'pref_bilingual';
 const kPrefRetryCount = 'pref_retry_count';
+const kPrefFallbackRetryCount = 'pref_fallback_retry_count';
 const kPrefFallbackUrl = 'pref_fallback_url';
 const kPrefFallbackApiKey = 'pref_fallback_api_key';
 const kPrefFallbackModel = 'pref_fallback_model';
@@ -92,6 +93,7 @@ class SettingsController extends ChangeNotifier {
   int maxChars = 1800;
   bool bilingual = false;
   int retryCount = 1;
+  int fallbackRetryCount = 1;
   String fallbackUrl = '';
   String fallbackApiKey = '';
   String fallbackModel = '';
@@ -141,7 +143,8 @@ class SettingsController extends ChangeNotifier {
     maxParagraphs = prefs.getInt(kPrefMaxParagraphs) ?? 6;
     maxChars = prefs.getInt(kPrefMaxChars) ?? 1800;
     bilingual = prefs.getBool(kPrefBilingual) ?? false;
-    retryCount = prefs.getInt(kPrefRetryCount) ?? 1;
+    retryCount = (prefs.getInt(kPrefRetryCount) ?? 1).clamp(0, 10).toInt();
+    fallbackRetryCount = (prefs.getInt(kPrefFallbackRetryCount) ?? retryCount).clamp(0, 10).toInt();
     fallbackUrl = prefs.getString(kPrefFallbackUrl) ?? '';
     fallbackApiKey = prefs.getString(kPrefFallbackApiKey) ?? '';
     fallbackModel = prefs.getString(kPrefFallbackModel) ?? '';
@@ -340,10 +343,20 @@ class SettingsController extends ChangeNotifier {
   }
 
   Future<void> setRetryCount(int value) async {
-    if (retryCount == value) return;
-    retryCount = value;
+    final next = value.clamp(0, 10).toInt();
+    if (retryCount == next) return;
+    retryCount = next;
     final prefs = await _getPrefs();
-    await prefs.setInt(kPrefRetryCount, value);
+    await prefs.setInt(kPrefRetryCount, next);
+    notifyListeners();
+  }
+
+  Future<void> setFallbackRetryCount(int value) async {
+    final next = value.clamp(0, 10).toInt();
+    if (fallbackRetryCount == next) return;
+    fallbackRetryCount = next;
+    final prefs = await _getPrefs();
+    await prefs.setInt(kPrefFallbackRetryCount, next);
     notifyListeners();
   }
 

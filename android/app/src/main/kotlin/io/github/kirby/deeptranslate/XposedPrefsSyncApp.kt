@@ -190,6 +190,7 @@ class XposedPrefsSyncApp : Application(), XposedServiceHelper.OnServiceListener 
             "pref_max_chars",
             "pref_bilingual",
             "pref_retry_count",
+            "pref_fallback_retry_count",
             "pref_fallback_url",
             "pref_fallback_api_key",
             "pref_fallback_model",
