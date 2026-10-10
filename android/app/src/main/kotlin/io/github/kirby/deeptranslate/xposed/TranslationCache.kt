@@ -1,16 +1,23 @@
 package io.github.kirby.deeptranslate.xposed
 
 import android.content.Context
+import android.content.Intent
 import android.database.sqlite.SQLiteDatabase
 import android.net.Uri
 import android.os.Bundle
+import android.os.Handler
+import android.os.HandlerThread
 import android.util.Log
+import io.github.kirby.deeptranslate.ModuleBroadcast
 import org.json.JSONArray
 import org.json.JSONObject
 import java.security.MessageDigest
 import java.util.Collections
 import java.util.LinkedHashMap
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
 
 /**
  * 翻译缓存只存在模块自己的数据库里。
@@ -30,6 +37,8 @@ object TranslationCache {
     })
     private val knownOutputs = ConcurrentHashMap.newKeySet<String>()
     private val knownNotOutputs = ConcurrentHashMap.newKeySet<String>()
+    private val resultThread = HandlerThread("dt-cache-result").apply { start() }
+    private val resultHandler = Handler(resultThread.looper)
 
     @Synchronized
     fun init(context: Context) {
@@ -176,12 +185,56 @@ object TranslationCache {
         if (ctx == null) return null
         val token = ConfigManager.getBroadcastToken()
         if (token.isEmpty()) return null
+        val rows = extras.getString("rows")
+        val hash = extras.getString("hash")
+        val hashes = extras.getStringArrayList("hashes")
         extras.putString("token", token)
         extras.putString("package", ctx.packageName)
-        return try {
+        val direct = try {
             ctx.contentResolver.call(CACHE_URI, method, null, extras)
         } catch (e: Exception) {
-            Log.w(TAG, "$method failed: ${e.message}")
+            Log.w(TAG, "$method provider failed: ${e.message}")
+            null
+        }
+        if (direct != null) return direct
+        return viaBroadcast(ctx, method, token, rows, hash, hashes)
+    }
+
+    /** Error logs already arrive this way. The provider call does not, so the cache stayed empty. */
+    private fun viaBroadcast(
+        ctx: Context,
+        method: String,
+        token: String,
+        rows: String?,
+        hash: String?,
+        hashes: ArrayList<String>?,
+    ): Bundle? {
+        val intent = Intent(ModuleBroadcast.ACTION_CACHE).apply {
+            setPackage("io.github.kirby.deeptranslate")
+            putExtra("op", method)
+            putExtra("package", ctx.packageName)
+            if (rows != null) putExtra("rows", rows)
+            if (hash != null) putExtra("hash", hash)
+            if (hashes != null) putStringArrayListExtra("hashes", hashes)
+        }
+        val reply = AtomicReference<Bundle?>()
+        val latch = CountDownLatch(1)
+        val receiver = object : android.content.BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) {
+                if (resultCode == android.app.Activity.RESULT_OK) reply.set(getResultExtras(true))
+                latch.countDown()
+            }
+        }
+        return try {
+            ModuleBroadcast.sendOrdered(ctx, intent, token, receiver, resultHandler)
+            if (!latch.await(8, TimeUnit.SECONDS)) {
+                Log.w(TAG, "$method broadcast timed out")
+                null
+            } else {
+                reply.get()
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "$method broadcast failed: ${e.message}")
             null
         }
     }

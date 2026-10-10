@@ -49,6 +49,13 @@
             android:authorities="io.github.kirby.deeptranslate.cache"
             android:exported="true" />
         <receiver
+            android:name=".CacheWriteReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="io.github.kirby.deeptranslate.CACHE_OP" />
+            </intent-filter>
+        </receiver>
+        <receiver
             android:name=".ErrorLogReceiver"
             android:exported="true">
             <intent-filter>

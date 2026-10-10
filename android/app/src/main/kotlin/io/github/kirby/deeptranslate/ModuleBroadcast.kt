@@ -1,12 +1,15 @@
 package io.github.kirby.deeptranslate
 
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.os.Handler
 
 /** Cross-app broadcasts must carry the module token and, on Android 14+, the sender identity. */
 object ModuleBroadcast {
     const val EXTRA_TOKEN = "token"
+    const val ACTION_CACHE = "io.github.kirby.deeptranslate.CACHE_OP"
 
     fun send(context: Context, intent: Intent, token: String) {
         if (token.isNotEmpty()) intent.putExtra(EXTRA_TOKEN, token)
@@ -16,6 +19,41 @@ object ModuleBroadcast {
             context.sendBroadcast(intent, null, options.toBundle())
         } else {
             context.sendBroadcast(intent)
+        }
+    }
+
+    /** Ordered so the module can write the cache and hand a result back. */
+    fun sendOrdered(
+        context: Context,
+        intent: Intent,
+        token: String,
+        resultReceiver: BroadcastReceiver,
+        scheduler: Handler,
+    ) {
+        if (token.isNotEmpty()) intent.putExtra(EXTRA_TOKEN, token)
+        if (Build.VERSION.SDK_INT >= 34) {
+            val options = android.app.BroadcastOptions.makeBasic()
+            options.setShareIdentityEnabled(true)
+            context.sendOrderedBroadcast(
+                intent,
+                null,
+                options.toBundle(),
+                resultReceiver,
+                scheduler,
+                android.app.Activity.RESULT_CANCELED,
+                null,
+                null,
+            )
+        } else {
+            context.sendOrderedBroadcast(
+                intent,
+                null,
+                resultReceiver,
+                scheduler,
+                android.app.Activity.RESULT_CANCELED,
+                null,
+                null,
+            )
         }
     }
 
