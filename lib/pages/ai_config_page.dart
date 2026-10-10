@@ -36,7 +36,12 @@ class _AiConfigPageState extends State<AiConfigPage> {
   String? _modelsStatus;
   _TestResult? _testResult;
 
-  late int _aiTimeoutDraft;
+  late int _connectDraft;
+  late int _readDraft;
+  late int _fbConnectDraft;
+  late int _fbReadDraft;
+  late int _backoffBaseDraft;
+  late int _backoffMaxDraft;
   late double _aiTemperatureDraft;
   late int _aiMaxTokensDraft;
   late int _batchSizeDraft;
@@ -57,7 +62,12 @@ class _AiConfigPageState extends State<AiConfigPage> {
     _fbUrlCtrl = TextEditingController(text: _ctrl.fallbackUrl);
     _fbKeyCtrl = TextEditingController(text: _ctrl.fallbackApiKey);
     _fbModelCtrl = TextEditingController(text: _ctrl.fallbackModel);
-    _aiTimeoutDraft = _ctrl.aiTimeout;
+    _connectDraft = _ctrl.connectTimeout.clamp(1, 60).toInt();
+    _readDraft = _ctrl.readTimeout.clamp(1, 180).toInt();
+    _fbConnectDraft = _ctrl.fallbackConnectTimeout.clamp(1, 60).toInt();
+    _fbReadDraft = _ctrl.fallbackReadTimeout.clamp(1, 180).toInt();
+    _backoffBaseDraft = _ctrl.backoffBaseMs.clamp(100, 10000).toInt();
+    _backoffMaxDraft = _ctrl.backoffMaxMs.clamp(500, 60000).toInt();
     _aiTemperatureDraft = _ctrl.aiTemperature;
     _aiMaxTokensDraft = _ctrl.aiMaxTokens;
     _batchSizeDraft = _ctrl.batchSize;
@@ -171,7 +181,9 @@ class _AiConfigPageState extends State<AiConfigPage> {
     await _ctrl.setAiApiKey(_keyCtrl.text.trim());
     await _ctrl.setAiModel(_modelCtrl.text.trim());
     await _ctrl.setAiPrompt(_promptCtrl.text.trim());
-    await _ctrl.setAiTimeout(_aiTimeoutDraft);
+    await _ctrl.setAiTimeout(_readDraft);
+    await _ctrl.setConnectTimeout(_connectDraft);
+    await _ctrl.setReadTimeout(_readDraft);
     await _ctrl.setAiTemperature(_aiTemperatureDraft);
     await _ctrl.setAiMaxTokens(_aiMaxTokensDraft);
     _toastSaved();
@@ -181,6 +193,10 @@ class _AiConfigPageState extends State<AiConfigPage> {
     await _ctrl.setFallbackUrl(_fbUrlCtrl.text.trim());
     await _ctrl.setFallbackApiKey(_fbKeyCtrl.text.trim());
     await _ctrl.setFallbackModel(_fbModelCtrl.text.trim());
+    await _ctrl.setFallbackConnectTimeout(_fbConnectDraft);
+    await _ctrl.setFallbackReadTimeout(_fbReadDraft);
+    await _ctrl.setBackoffBaseMs(_backoffBaseDraft);
+    await _ctrl.setBackoffMaxMs(_backoffMaxDraft);
     await _ctrl.setRetryCount(_retryDraft);
     _toastSaved();
   }
@@ -243,7 +259,7 @@ class _AiConfigPageState extends State<AiConfigPage> {
             },
             body: requestBody,
           )
-          .timeout(Duration(seconds: _aiTimeoutDraft));
+          .timeout(Duration(seconds: _connectDraft + _readDraft));
 
       if (response.statusCode == 200) {
         final json = jsonDecode(response.body) as Map<String, dynamic>;
@@ -407,39 +423,27 @@ class _AiConfigPageState extends State<AiConfigPage> {
                         _buildPromptTile(),
                         const SizedBox(height: 24),
 
-                        // ── 超时 ──
-                        Row(
-                          children: [
-                            const FaIcon(FontAwesomeIcons.clock, size: 18),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(l10n.timeout, style: textTheme.titleMedium),
-                                  Text(
-                                    l10n.timeoutSeconds(_aiTimeoutDraft),
-                                    style: textTheme.bodySmall?.copyWith(
-                                      color: cs.onSurfaceVariant,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
+                        _limitSlider(
+                          icon: const Icon(Icons.handshake_outlined, size: 18),
+                          title: l10n.handshakeTimeout,
+                          subtitle: l10n.handshakeTimeoutDesc,
+                          valueLabel: l10n.timeoutSeconds(_connectDraft),
+                          value: _connectDraft.toDouble(),
+                          min: 1,
+                          max: 60,
+                          divisions: 59,
+                          onChanged: (v) => setState(() => _connectDraft = v.round()),
                         ),
-                        SliderTheme(
-                          data: ModernSliderTheme.theme(context),
-                          child: Slider(
-                            value: _aiTimeoutDraft.toDouble(),
-                            min: 3,
-                            max: 30,
-                            divisions: 27,
-                            label: l10n.timeoutSeconds(_aiTimeoutDraft),
-                            onChanged: (v) => setState(
-                              () => _aiTimeoutDraft = v.round(),
-                            ),
-                          ),
+                        _limitSlider(
+                          icon: const FaIcon(FontAwesomeIcons.clock, size: 18),
+                          title: l10n.responseTimeout,
+                          subtitle: l10n.responseTimeoutDesc,
+                          valueLabel: l10n.timeoutSeconds(_readDraft),
+                          value: _readDraft.toDouble(),
+                          min: 1,
+                          max: 180,
+                          divisions: 179,
+                          onChanged: (v) => setState(() => _readDraft = v.round()),
                         ),
 
                         const SizedBox(height: 16),
@@ -578,6 +582,50 @@ class _AiConfigPageState extends State<AiConfigPage> {
                           label: l10n.fallbackModel,
                           hint: l10n.modelHint,
                           icon: FontAwesomeIcons.cube,
+                        ),
+                        _limitSlider(
+                          icon: const Icon(Icons.handshake_outlined, size: 18),
+                          title: l10n.fallbackHandshakeTimeout,
+                          subtitle: l10n.handshakeTimeoutDesc,
+                          valueLabel: l10n.timeoutSeconds(_fbConnectDraft),
+                          value: _fbConnectDraft.toDouble(),
+                          min: 1,
+                          max: 60,
+                          divisions: 59,
+                          onChanged: (v) => setState(() => _fbConnectDraft = v.round()),
+                        ),
+                        _limitSlider(
+                          icon: const FaIcon(FontAwesomeIcons.clock, size: 18),
+                          title: l10n.fallbackResponseTimeout,
+                          subtitle: l10n.responseTimeoutDesc,
+                          valueLabel: l10n.timeoutSeconds(_fbReadDraft),
+                          value: _fbReadDraft.toDouble(),
+                          min: 1,
+                          max: 180,
+                          divisions: 179,
+                          onChanged: (v) => setState(() => _fbReadDraft = v.round()),
+                        ),
+                        _limitSlider(
+                          icon: const Icon(Icons.timer_outlined, size: 18),
+                          title: l10n.backoffBase,
+                          subtitle: l10n.backoffBaseDesc,
+                          valueLabel: l10n.backoffMs(_backoffBaseDraft),
+                          value: _backoffBaseDraft.toDouble(),
+                          min: 100,
+                          max: 5000,
+                          divisions: 49,
+                          onChanged: (v) => setState(() => _backoffBaseDraft = (v / 100).round() * 100),
+                        ),
+                        _limitSlider(
+                          icon: const Icon(Icons.timer, size: 18),
+                          title: l10n.backoffMax,
+                          subtitle: l10n.backoffMaxDesc,
+                          valueLabel: l10n.backoffMs(_backoffMaxDraft),
+                          value: _backoffMaxDraft.toDouble(),
+                          min: 1000,
+                          max: 30000,
+                          divisions: 58,
+                          onChanged: (v) => setState(() => _backoffMaxDraft = (v / 500).round() * 500),
                         ),
                         _limitSlider(
                           icon: const Icon(Icons.replay, size: 18),

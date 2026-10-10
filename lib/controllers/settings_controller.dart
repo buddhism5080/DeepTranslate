@@ -10,6 +10,12 @@ const kPrefAiModel = 'pref_ai_model';
 const kPrefAiPrompt = 'pref_ai_prompt';
 const kPrefAiTargetLang = 'pref_ai_target_lang';
 const kPrefAiTimeout = 'pref_ai_timeout';
+const kPrefAiConnectTimeout = 'pref_ai_connect_timeout';
+const kPrefAiReadTimeout = 'pref_ai_read_timeout';
+const kPrefFallbackConnectTimeout = 'pref_fallback_connect_timeout';
+const kPrefFallbackReadTimeout = 'pref_fallback_read_timeout';
+const kPrefBackoffBaseMs = 'pref_backoff_base_ms';
+const kPrefBackoffMaxMs = 'pref_backoff_max_ms';
 const kPrefAiTemperature = 'pref_ai_temperature';
 const kPrefAiMaxTokens = 'pref_ai_max_tokens';
 const kPrefBatchSize = 'pref_batch_size';
@@ -71,6 +77,12 @@ class SettingsController extends ChangeNotifier {
   String aiPrompt = kDefaultPrompt;
   String aiTargetLang = kDefaultTargetLang;
   int aiTimeout = 10;
+  int connectTimeout = 10;
+  int readTimeout = 30;
+  int fallbackConnectTimeout = 10;
+  int fallbackReadTimeout = 30;
+  int backoffBaseMs = 500;
+  int backoffMaxMs = 8000;
   double aiTemperature = 0.1;
   int aiMaxTokens = 4096;
   int batchSize = 20;
@@ -115,6 +127,12 @@ class SettingsController extends ChangeNotifier {
     aiPrompt = prefs.getString(kPrefAiPrompt) ?? kDefaultPrompt;
     aiTargetLang = prefs.getString(kPrefAiTargetLang) ?? kDefaultTargetLang;
     aiTimeout = prefs.getInt(kPrefAiTimeout) ?? 10;
+    connectTimeout = prefs.getInt(kPrefAiConnectTimeout) ?? aiTimeout;
+    readTimeout = prefs.getInt(kPrefAiReadTimeout) ?? aiTimeout;
+    fallbackConnectTimeout = prefs.getInt(kPrefFallbackConnectTimeout) ?? connectTimeout;
+    fallbackReadTimeout = prefs.getInt(kPrefFallbackReadTimeout) ?? readTimeout;
+    backoffBaseMs = prefs.getInt(kPrefBackoffBaseMs) ?? 500;
+    backoffMaxMs = prefs.getInt(kPrefBackoffMaxMs) ?? 8000;
     aiTemperature = prefs.getDouble(kPrefAiTemperature) ?? 0.1;
     aiMaxTokens = prefs.getInt(kPrefAiMaxTokens) ?? 4096;
     batchSize = prefs.getInt(kPrefBatchSize) ?? 20;
@@ -200,6 +218,60 @@ class SettingsController extends ChangeNotifier {
     aiTimeout = value;
     final prefs = await _getPrefs();
     await prefs.setInt(kPrefAiTimeout, value);
+    notifyListeners();
+  }
+
+  Future<void> setConnectTimeout(int value) async {
+    final next = value.clamp(1, 60).toInt();
+    if (connectTimeout == next) return;
+    connectTimeout = next;
+    final prefs = await _getPrefs();
+    await prefs.setInt(kPrefAiConnectTimeout, next);
+    notifyListeners();
+  }
+
+  Future<void> setReadTimeout(int value) async {
+    final next = value.clamp(1, 180).toInt();
+    if (readTimeout == next) return;
+    readTimeout = next;
+    final prefs = await _getPrefs();
+    await prefs.setInt(kPrefAiReadTimeout, next);
+    notifyListeners();
+  }
+
+  Future<void> setFallbackConnectTimeout(int value) async {
+    final next = value.clamp(1, 60).toInt();
+    if (fallbackConnectTimeout == next) return;
+    fallbackConnectTimeout = next;
+    final prefs = await _getPrefs();
+    await prefs.setInt(kPrefFallbackConnectTimeout, next);
+    notifyListeners();
+  }
+
+  Future<void> setFallbackReadTimeout(int value) async {
+    final next = value.clamp(1, 180).toInt();
+    if (fallbackReadTimeout == next) return;
+    fallbackReadTimeout = next;
+    final prefs = await _getPrefs();
+    await prefs.setInt(kPrefFallbackReadTimeout, next);
+    notifyListeners();
+  }
+
+  Future<void> setBackoffBaseMs(int value) async {
+    final next = value.clamp(100, 10000).toInt();
+    if (backoffBaseMs == next) return;
+    backoffBaseMs = next;
+    final prefs = await _getPrefs();
+    await prefs.setInt(kPrefBackoffBaseMs, next);
+    notifyListeners();
+  }
+
+  Future<void> setBackoffMaxMs(int value) async {
+    final next = value.clamp(500, 60000).toInt();
+    if (backoffMaxMs == next) return;
+    backoffMaxMs = next;
+    final prefs = await _getPrefs();
+    await prefs.setInt(kPrefBackoffMaxMs, next);
     notifyListeners();
   }
 

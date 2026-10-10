@@ -36,6 +36,22 @@
   "fetchModels": "Fetch Models",
   "translatePrompt": "Translation Prompt",
   "timeout": "Timeout",
+  "handshakeTimeout": "Handshake timeout",
+  "handshakeTimeoutDesc": "How long the connection, including TLS, may take. This ends when the handshake succeeds.",
+  "responseTimeout": "Response timeout",
+  "responseTimeoutDesc": "How long to wait for the reply after the handshake. Sending the request is not counted.",
+  "fallbackHandshakeTimeout": "Fallback handshake timeout",
+  "fallbackResponseTimeout": "Fallback response timeout",
+  "backoffBase": "Backoff base",
+  "backoffBaseDesc": "Wait this long before the first retry, then twice as long each time. Both channels use it.",
+  "backoffMax": "Backoff cap",
+  "backoffMaxDesc": "A retry will not wait longer than this.",
+  "backoffMs": "{ms} ms",
+  "@backoffMs": {
+    "placeholders": {
+      "ms": { "type": "int" }
+    }
+  },
   "temperature": "Temperature",
   "maxTokens": "Max Tokens",
   "save": "Save",
@@ -127,7 +143,7 @@
   "fallbackUrl": "Fallback API URL",
   "fallbackModel": "Fallback model",
   "retryCount": "Retries",
-  "retryCountDesc": "Extra tries on the current channel before switching. 0 switches on the first error.",
+  "retryCountDesc": "How many backoff retries the main channel gets. After that, backoff resets and the fallback channel is used. The fallback channel starts from the base delay and gets the same number of retries. 0 switches on the first error.",
   "errorLog": "Error log",
   "errorLogDesc": "Network errors, non-200 responses, and replies that could not be parsed. Grouped by app.",
   "noErrorLog": "No errors yet",

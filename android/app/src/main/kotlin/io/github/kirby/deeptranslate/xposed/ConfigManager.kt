@@ -102,7 +102,13 @@ object ConfigManager {
     fun getAiModel(): String = getString("pref_ai_model", "deepseek-v4-flash")
     fun getAiPrompt(): String = getString("pref_ai_prompt", "")
     fun getTargetLang(): String = getString("pref_ai_target_lang", "中文")
-    fun getAiTimeout(): Int = getInt("pref_ai_timeout", 10)
+    fun getAiTimeout(): Int = getInt("pref_ai_timeout", 10).coerceIn(1, 180)
+    fun getAiConnectTimeout(): Int = getInt("pref_ai_connect_timeout", getAiTimeout()).coerceIn(1, 60)
+    fun getAiReadTimeout(): Int = getInt("pref_ai_read_timeout", getAiTimeout()).coerceIn(1, 180)
+    fun getFallbackConnectTimeout(): Int = getInt("pref_fallback_connect_timeout", getAiConnectTimeout()).coerceIn(1, 60)
+    fun getFallbackReadTimeout(): Int = getInt("pref_fallback_read_timeout", getAiReadTimeout()).coerceIn(1, 180)
+    fun getBackoffBaseMs(): Int = getInt("pref_backoff_base_ms", 500).coerceIn(100, 10_000)
+    fun getBackoffMaxMs(): Int = getInt("pref_backoff_max_ms", 8_000).coerceIn(500, 60_000)
     fun getAiTemperature(): Double = getDouble("pref_ai_temperature", 0.1)
     fun getAiMaxTokens(): Int = getInt("pref_ai_max_tokens", 4096)
     fun getBatchSize(): Int = getInt("pref_batch_size", 20).coerceIn(1, 50)
@@ -163,7 +169,10 @@ object ConfigManager {
     private val CORE_PREF_KEYS = setOf(
         "pref_translation_enabled", "pref_ai_url", "pref_ai_api_key",
         "pref_ai_model", "pref_ai_prompt", "pref_ai_target_lang",
-        "pref_ai_timeout", "pref_ai_temperature", "pref_ai_max_tokens",
+        "pref_ai_timeout", "pref_ai_connect_timeout", "pref_ai_read_timeout",
+        "pref_fallback_connect_timeout", "pref_fallback_read_timeout",
+        "pref_backoff_base_ms", "pref_backoff_max_ms",
+        "pref_ai_temperature", "pref_ai_max_tokens",
         "pref_batch_size", "pref_batch_window_ms", "pref_cache_enabled", "pref_cache_limit", "pref_broadcast_token",
         "pref_concurrency", "pref_max_paragraphs", "pref_max_chars", "pref_bilingual",
         "pref_retry_count", "pref_fallback_url", "pref_fallback_api_key", "pref_fallback_model",

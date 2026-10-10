@@ -5,10 +5,7 @@ import io.github.kirby.deeptranslate.ModuleBroadcast
 import io.github.libxposed.api.XposedModule
 import org.json.JSONArray
 import org.json.JSONObject
-import java.io.OutputStreamWriter
-import java.net.HttpURLConnection
 import java.net.URL
-import java.util.concurrent.TimeUnit
 
 object TranslationEngine {
 
@@ -43,7 +40,14 @@ object TranslationEngine {
         val sourceLang: String
     )
 
-    private data class Channel(val name: String, val chatUrl: String, val apiKey: String, val model: String)
+    private data class Channel(
+        val name: String,
+        val chatUrl: String,
+        val apiKey: String,
+        val model: String,
+        val connectMs: Int,
+        val readMs: Int,
+    )
 
     private data class ParsedLine(val id: Int, val hasId: Boolean, val translation: String, val lang: String)
 
@@ -51,6 +55,10 @@ object TranslationEngine {
         val translated: Map<String, TranslationEntry>,
         val httpStatus: Int,
         val authFailure: Boolean,
+        val errorKind: String = "",
+        val errorMessage: String = "",
+        val requestBody: String = "",
+        val responseBody: String = "",
     )
 
     fun translateBatch(request: BatchRequest, module: XposedModule?): BatchResult {
@@ -59,21 +67,32 @@ object TranslationEngine {
         if (items.isEmpty()) return BatchResult(emptyMap(), true)
         val pinned = request.copy(targetLang = request.targetLang.ifBlank { ConfigManager.getTargetLang() })
 
-        val primary = channel("primary", ConfigManager.getAiUrl(), ConfigManager.getAiApiKey(), ConfigManager.getAiModel())
+        val primary = channel(
+            "primary",
+            ConfigManager.getAiUrl(),
+            ConfigManager.getAiApiKey(),
+            ConfigManager.getAiModel(),
+            ConfigManager.getAiConnectTimeout(),
+            ConfigManager.getAiReadTimeout(),
+        )
         val fallback = channel(
             "fallback",
             ConfigManager.getFallbackUrl(),
             ConfigManager.getFallbackApiKey(),
             ConfigManager.getFallbackModel(),
+            ConfigManager.getFallbackConnectTimeout(),
+            ConfigManager.getFallbackReadTimeout(),
         )
         val channels = listOfNotNull(primary, fallback)
         if (channels.isEmpty()) return BatchResult(emptyMap(), false, "API URL not configured")
 
         val done = linkedMapOf<String, TranslationEntry>()
         var pending = items.distinctBy { it.text }
+        val backoff = Backoff()
         for (target in channels) {
             if (pending.isEmpty()) break
-            val got = drain(target, pending, pinned, module)
+            backoff.clear()
+            val got = drain(target, pending, pinned, module, backoff)
             done.putAll(got)
             pending = pending.filter { it.text !in done }
         }
@@ -84,56 +103,74 @@ object TranslationEngine {
         return BatchResult(done, complete, if (complete) "" else "incomplete")
     }
 
-    private fun channel(name: String, url: String, apiKey: String, model: String): Channel? {
+    private fun channel(
+        name: String,
+        url: String,
+        apiKey: String,
+        model: String,
+        connectSeconds: Int,
+        readSeconds: Int,
+    ): Channel? {
         if (model.isBlank()) return null
         val endpoints = OpenAiEndpoints.resolve(url) ?: return null
-        return Channel(name, endpoints.chat, apiKey, model)
+        return Channel(
+            name,
+            endpoints.chat,
+            apiKey,
+            model,
+            connectSeconds.coerceIn(1, 60) * 1000,
+            readSeconds.coerceIn(1, 180) * 1000,
+        )
     }
 
-    /** One batch attempt, then each still-missing line on its own. A shared counter must not let one failure eat the others. */
+    /**
+     * Retry the lines still missing, with backoff between tries.
+     * [ConfigManager.getRetryCount] is how many retries this channel gets.
+     * When they are used up the caller clears backoff and moves to the fallback channel.
+     */
     private fun drain(
         target: Channel,
         items: List<TranslateItem>,
         request: BatchRequest,
         module: XposedModule?,
+        backoff: Backoff,
     ): Map<String, TranslationEntry> {
         val done = linkedMapOf<String, TranslationEntry>()
         if (items.isEmpty()) return done
-        val first = requestOnce(target, items, request.scene, request.packageName, request.targetLang, module)
-        done.putAll(first.translated)
-        if (first.authFailure) {
-            module?.log(Log.WARN, TAG, "${target.name} rejected auth, switching channel")
-            return done
-        }
-        val missed = items.filter { it.text !in done }
-        if (missed.isEmpty()) return done
-        val solos = if (items.size > 1 && first.httpStatus in 200..299) {
-            maxOf(1, ConfigManager.getRetryCount())
-        } else {
-            ConfigManager.getRetryCount()
-        }
-        for (item in missed) {
-            var attempt = 0
-            while (attempt < solos && item.text !in done) {
-                if (attempt > 0) pause(attempt)
-                attempt++
-                val call = requestOnce(target, listOf(item), request.scene, request.packageName, request.targetLang, module)
-                if (call.authFailure) {
-                    module?.log(Log.WARN, TAG, "${target.name} rejected auth, switching channel")
-                    return done
-                }
-                call.translated[item.text]?.let { done[item.text] = it }
-                if (item.text !in done && call.httpStatus == 429) pause(attempt)
+        val limit = ConfigManager.getRetryCount()
+        var pending = items
+        var tries = 0
+        while (pending.isNotEmpty()) {
+            val call = requestOnce(target, pending, request.scene, request.packageName, request.targetLang, module)
+            done.putAll(call.translated)
+            if (call.authFailure) {
+                module?.log(Log.WARN, TAG, "${target.name} rejected auth, switching channel")
+                reportStored(module, request.packageName, call)
+                return done
             }
+            pending = pending.filter { it.text !in done }
+            if (pending.isEmpty()) return done
+            if (tries >= limit) {
+                reportStored(module, request.packageName, call)
+                return done
+            }
+            tries++
+            backoff.pause()
         }
         return done
     }
 
-    private fun pause(attempt: Int) {
-        try {
-            Thread.sleep(200L * attempt)
-        } catch (_: InterruptedException) {
-        }
+    private fun reportStored(module: XposedModule?, packageName: String, call: CallResult) {
+        if (call.errorKind.isEmpty()) return
+        reportError(
+            module,
+            packageName,
+            call.errorKind,
+            call.httpStatus,
+            call.errorMessage,
+            call.requestBody,
+            call.responseBody,
+        )
     }
 
     private fun requestOnce(
@@ -144,7 +181,6 @@ object TranslationEngine {
         targetLang: String,
         module: XposedModule?,
     ): CallResult {
-        val timeout = ConfigManager.getAiTimeout()
         val prompt = buildPrompt(targetLang, scene)
         val userContent = buildUserContent(scene, packageName, items, targetLang)
         val body = buildRequestBody(
@@ -153,45 +189,147 @@ object TranslationEngine {
         )
         module?.log(Log.INFO, TAG, "${target.name} ${items.size} ${scene} texts for $packageName")
 
-        var connection: HttpURLConnection? = null
         try {
-            connection = (URL(target.chatUrl).openConnection() as HttpURLConnection).apply {
-                requestMethod = "POST"
-                connectTimeout = TimeUnit.SECONDS.toMillis(timeout.toLong()).toInt()
-                readTimeout = TimeUnit.SECONDS.toMillis(timeout.toLong()).toInt()
-                doOutput = true
-                setRequestProperty("Content-Type", "application/json")
-                setRequestProperty("Accept", "application/json")
-                if (target.apiKey.isNotEmpty()) setRequestProperty("Authorization", "Bearer ${target.apiKey}")
-            }
-            OutputStreamWriter(connection.outputStream, Charsets.UTF_8).use { writer ->
-                writer.write(body)
-                writer.flush()
-            }
-            val responseCode = connection.responseCode
-            val responseBody = if (responseCode in 200..299) {
-                connection.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
-            } else {
-                connection.errorStream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() } ?: ""
-            }
+            val reply = postOwn(target.chatUrl, body, target.apiKey, target.connectMs, target.readMs)
+            val responseCode = reply.code
+            val responseBody = reply.body
             if (responseCode !in 200..299) {
                 module?.log(Log.ERROR, TAG, "${target.name} HTTP $responseCode: ${responseBody.take(300)}")
-                reportError(module, packageName, "http", responseCode, "HTTP $responseCode", body, responseBody)
-                return CallResult(emptyMap(), responseCode, responseCode == 401 || responseCode == 403)
+                return CallResult(
+                    emptyMap(),
+                    responseCode,
+                    responseCode == 401 || responseCode == 403,
+                    "http",
+                    "HTTP $responseCode",
+                    body,
+                    responseBody,
+                )
             }
             val translations = parseResponse(responseBody, items.map { it.text })
             if (translations.isEmpty() && items.isNotEmpty()) {
-                reportError(module, packageName, "parse", responseCode, "响应无法解析成译文", body, responseBody)
+                return CallResult(emptyMap(), responseCode, false, "parse", "响应无法解析成译文", body, responseBody)
             }
             module?.log(Log.INFO, TAG, "${target.name} parsed ${translations.size}/${items.size}")
             sendStatsUpdate(module, translations.size, packageName)
             return CallResult(translations, responseCode, false)
         } catch (e: Exception) {
             module?.log(Log.ERROR, TAG, "${target.name} failed: ${e.message}")
-            reportError(module, packageName, "network", 0, e.message ?: e.javaClass.simpleName, body, "")
-            return CallResult(emptyMap(), 0, false)
+            return CallResult(emptyMap(), 0, false, "network", e.message ?: e.javaClass.simpleName, body, "")
+        }
+    }
+
+    /** Our own socket. The app closing its client on a page change cannot abort this. */
+    private fun postOwn(url: String, json: String, apiKey: String, connectMs: Int, readMs: Int): HttpReply {
+        val parsed = URL(url)
+        val https = parsed.protocol.equals("https", ignoreCase = true)
+        val port = if (parsed.port != -1) parsed.port else if (https) 443 else 80
+        val path = buildString {
+            append(if (parsed.path.isNullOrEmpty()) "/" else parsed.path)
+            if (!parsed.query.isNullOrEmpty()) append('?').append(parsed.query)
+        }
+        val hostHeader = if (parsed.port == -1) parsed.host else "${parsed.host}:${parsed.port}"
+        val started = System.nanoTime()
+        val tcp = java.net.Socket()
+        tcp.connect(java.net.InetSocketAddress(parsed.host, port), connectMs)
+        var active: java.net.Socket = tcp
+        try {
+            if (https) {
+                val used = ((System.nanoTime() - started) / 1_000_000L).toInt()
+                val left = (connectMs - used).coerceAtLeast(1)
+                val ssl = (javax.net.ssl.SSLSocketFactory.getDefault() as javax.net.ssl.SSLSocketFactory)
+                    .createSocket(tcp, parsed.host, port, true) as javax.net.ssl.SSLSocket
+                active = ssl
+                ssl.soTimeout = left
+                ssl.startHandshake()
+                val ok = javax.net.ssl.HttpsURLConnection.getDefaultHostnameVerifier()
+                    .verify(parsed.host, ssl.session)
+                if (!ok) throw javax.net.ssl.SSLException("hostname mismatch")
+            }
+            active.soTimeout = readMs
+            val payload = json.toByteArray(Charsets.UTF_8)
+            val header = buildString {
+                append("POST $path HTTP/1.1\r\n")
+                append("Host: $hostHeader\r\n")
+                append("Content-Type: application/json\r\n")
+                append("Accept: application/json\r\n")
+                append("Connection: close\r\n")
+                append("Content-Length: ${payload.size}\r\n")
+                if (apiKey.isNotEmpty()) append("Authorization: Bearer $apiKey\r\n")
+                append("\r\n")
+            }
+            val out = active.getOutputStream()
+            out.write(header.toByteArray(Charsets.US_ASCII))
+            out.write(payload)
+            out.flush()
+            return readHttp(active.getInputStream().buffered())
         } finally {
-            connection?.disconnect()
+            try {
+                active.close()
+            } catch (_: Exception) {
+            }
+        }
+    }
+
+    private data class HttpReply(val code: Int, val body: String)
+
+    private fun readHttp(input: java.io.BufferedInputStream): HttpReply {
+        val status = readLine(input)
+        val code = status.split(' ').getOrNull(1)?.toIntOrNull() ?: 0
+        var length = -1
+        var chunked = false
+        while (true) {
+            val line = readLine(input)
+            if (line.isEmpty()) break
+            val lower = line.lowercase()
+            if (lower.startsWith("content-length:")) length = line.substringAfter(':').trim().toIntOrNull() ?: -1
+            if (lower.startsWith("transfer-encoding:") && lower.contains("chunked")) chunked = true
+        }
+        val body = when {
+            chunked -> readChunked(input)
+            length >= 0 -> input.readNBytes(length).toString(Charsets.UTF_8)
+            else -> input.readBytes().toString(Charsets.UTF_8)
+        }
+        return HttpReply(code, body)
+    }
+
+    private fun readChunked(input: java.io.BufferedInputStream): String {
+        val out = java.io.ByteArrayOutputStream()
+        while (true) {
+            val size = readLine(input).substringBefore(';').trim().toIntOrNull(16) ?: break
+            if (size == 0) break
+            out.write(input.readNBytes(size))
+            readLine(input)
+        }
+        return out.toString(Charsets.UTF_8)
+    }
+
+    private fun readLine(input: java.io.BufferedInputStream): String {
+        val buf = java.io.ByteArrayOutputStream()
+        while (true) {
+            val b = input.read()
+            if (b < 0 || b == '\n'.code) break
+            if (b != '\r'.code) buf.write(b)
+        }
+        return buf.toString(Charsets.ISO_8859_1.name())
+    }
+
+    private class Backoff {
+        private var step = 0
+
+        fun clear() {
+            step = 0
+        }
+
+        fun pause() {
+            val base = ConfigManager.getBackoffBaseMs().coerceAtLeast(100)
+            val cap = ConfigManager.getBackoffMaxMs().coerceAtLeast(base)
+            val delay = (base.toLong() shl step.coerceAtMost(8)).coerceAtMost(cap.toLong())
+            step++
+            try {
+                Thread.sleep(delay)
+            } catch (_: InterruptedException) {
+                Thread.currentThread().interrupt()
+            }
         }
     }
 
