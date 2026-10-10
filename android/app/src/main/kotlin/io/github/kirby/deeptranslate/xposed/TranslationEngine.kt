@@ -262,9 +262,14 @@ $base
             val arr = extractArray(content)
             if (arr == null) {
                 if (originals.size == 1) {
-                    val plain = content.replace("```json", "").replace("```", "").trim()
-                    if (plain.isNotEmpty() && !plain.startsWith("{") && !plain.startsWith("[")) {
-                        result[originals[0]] = TranslationEntry(originals[0], plain, "auto")
+                    val objectText = translationOfObject(content)
+                    if (objectText != null) {
+                        result[originals[0]] = TranslationEntry(originals[0], objectText, "auto")
+                    } else {
+                        val plain = content.replace("```json", "").replace("```", "").trim()
+                        if (plain.isNotEmpty() && '{' !in plain && '[' !in plain) {
+                            result[originals[0]] = TranslationEntry(originals[0], plain, "auto")
+                        }
                     }
                 }
                 return result
@@ -293,7 +298,7 @@ $base
                 val index = when {
                     oneBased && row.hasId -> row.id - 1
                     row.hasId && row.id in originals.indices -> row.id
-                    !row.hasId && rows.size == n -> position
+                    !row.hasId && explicitIds.isEmpty() && rows.size == n -> position
                     else -> -1
                 }
                 if (index !in originals.indices || index in byId) continue
@@ -321,13 +326,43 @@ $base
 
     private fun extractArray(content: String): JSONArray? {
         val cleaned = content.replace("```json", "").replace("```", "").trim()
-        val start = cleaned.indexOf('[')
+        var from = 0
+        while (from < cleaned.length) {
+            val start = cleaned.indexOf('[', from)
+            if (start < 0) return null
+            val end = matchingBracket(cleaned, start) ?: return null
+            try {
+                return JSONArray(cleaned.substring(start, end + 1))
+            } catch (_: Exception) {
+                from = start + 1
+            }
+        }
+        return null
+    }
+
+    private fun translationOfObject(content: String): String? {
+        val cleaned = content.replace("```json", "").replace("```", "").trim()
+        val start = cleaned.indexOf('{')
         if (start < 0) return null
+        val end = matchingBrace(cleaned, start) ?: return null
+        return try {
+            val obj = JSONObject(cleaned.substring(start, end + 1))
+            obj.optString("translation", "").ifBlank { obj.optString("translated", "") }.ifBlank { null }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun matchingBracket(text: String, start: Int): Int? = matching(text, start, '[', ']')
+
+    private fun matchingBrace(text: String, start: Int): Int? = matching(text, start, '{', '}')
+
+    private fun matching(text: String, start: Int, open: Char, close: Char): Int? {
         var depth = 0
         var inString = false
         var escaped = false
-        for (i in start until cleaned.length) {
-            val c = cleaned[i]
+        for (i in start until text.length) {
+            val c = text[i]
             if (inString) {
                 if (escaped) escaped = false
                 else if (c == '\\') escaped = true
@@ -336,16 +371,10 @@ $base
             }
             when (c) {
                 '"' -> inString = true
-                '[' -> depth++
-                ']' -> {
+                open -> depth++
+                close -> {
                     depth--
-                    if (depth == 0) {
-                        return try {
-                            JSONArray(cleaned.substring(start, i + 1))
-                        } catch (_: Exception) {
-                            null
-                        }
-                    }
+                    if (depth == 0) return i
                 }
             }
         }

@@ -27,7 +27,6 @@ object ReactNativeHook : BaseHook() {
     override fun getTag() = "DeepTranslate[RN]"
 
     override fun onInit(module: XposedModule, param: PackageLoadedParam) {
-        if (!ConfigManager.isTranslationEnabled()) return
         val loader = param.defaultClassLoader
         val legacy = load(loader, "com.facebook.react.views.text.ReactTextView")
         if (legacy != null) log(module, "ReactTextView present; TextView hook covers it")
@@ -47,6 +46,7 @@ object ReactNativeHook : BaseHook() {
         setter.isAccessible = true
         val batcher = TranslationSession.batcher(module, param.packageName)
         module.hook(setter).intercept { chain ->
+            if (!ConfigManager.isTranslationEnabled()) return@intercept chain.proceed()
             val view = chain.thisObject as? View ?: return@intercept chain.proceed()
             val prepared = chain.args.getOrNull(0) ?: return@intercept chain.proceed()
             val original = textOf(prepared) ?: return@intercept chain.proceed()

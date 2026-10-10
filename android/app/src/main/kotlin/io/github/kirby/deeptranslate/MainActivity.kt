@@ -22,11 +22,18 @@ class MainActivity : FlutterActivity() {
 
     private fun safePackage(pkg: String): String? = pkg.takeIf { packageNamePattern.matches(it) }
 
+    /** API 34+ 能看出广播是谁发的。发送方必须就是 extras 里的那个包。 */
+    private fun BroadcastReceiver.senderOwns(pkg: String): Boolean {
+        if (android.os.Build.VERSION.SDK_INT < 34) return true
+        return sentFromPackage == pkg
+    }
+
     private val tokenReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             val cached = intent?.getIntExtra("cached", 0) ?: 0
             val pkg = safePackage(intent?.getStringExtra("package") ?: "") ?: return
             if (cached !in 1..1000) return
+            if (!senderOwns(pkg)) return
             val prefs = getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
             try {
                 val jsonObj = JSONObject(prefs.getString(CACHE_PREFS_KEY, "{}") ?: "{}")
@@ -45,6 +52,7 @@ class MainActivity : FlutterActivity() {
     private val cacheClearedReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             val pkg = safePackage(intent?.getStringExtra("package") ?: "") ?: return
+            if (!senderOwns(pkg)) return
             val prefs = getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
             val jsonStr = prefs.getString(CACHE_PREFS_KEY, "{}") ?: "{}"
             try {

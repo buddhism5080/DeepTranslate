@@ -27,10 +27,6 @@ object TextViewHook : BaseHook() {
     private var batcher: TextBatcher? = null
 
     override fun onInit(module: XposedModule, param: PackageLoadedParam) {
-        if (!ConfigManager.isTranslationEnabled()) {
-            log(module, "translation disabled, skipping")
-            return
-        }
         if (batcher == null) batcher = TranslationSession.batcher(module, param.packageName)
         hookSetTextMethods(module, param)
         log(module, "TextViewHook active for ${param.packageName}")
@@ -125,7 +121,7 @@ object TextViewHook : BaseHook() {
                 val result = chain.proceed()
                 if (applying.contains(System.identityHashCode(textView))) return@intercept result
 
-                if (chars != null && len > 0 && !isEditText(textView) && !isPasswordField(textView)) {
+                if (chars != null && len > 0 && ConfigManager.isTranslationEnabled() && !isEditText(textView) && !isPasswordField(textView)) {
                     val textStr = String(chars, start, len)
                     if (textStr.length >= 2 && TextGate.shouldTranslate(textStr)) {
                         val key = pendingKey(textView, textStr)
@@ -287,6 +283,7 @@ object TextViewHook : BaseHook() {
     // ── 判断 ────────────────────────────────────────────────────────────────
 
     private fun shouldTranslate(textView: TextView, text: CharSequence?): Boolean {
+        if (!ConfigManager.isTranslationEnabled()) return false
         if (text == null) return false
         val textStr = text.toString()
         if (textStr.isBlank() || textStr.length < 2) return false

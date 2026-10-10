@@ -122,7 +122,7 @@ object TextChunks {
                     blocks.add(Piece(line, "title"))
                 }
                 kind == "list" -> {
-                    if (role == "list") flush()
+                    if (role.isNotEmpty()) flush()
                     role = "list"
                     current.append(line)
                 }
@@ -291,7 +291,7 @@ object TextChunks {
             }
             k++
         }
-        return text.length
+        return null
     }
 
     private fun nextFenceStart(text: String, from: Int): Int {

@@ -156,7 +156,7 @@ object TranslationCache {
     /** 译文本身。命中后不再送去翻译，避免布局刷新打成环。 */
     fun isKnownOutput(text: String): Boolean {
         if (text.isEmpty()) return false
-        val hash = sha256(text)
+        val hash = sha256(scoped(text))
         if (knownOutputs.contains(hash)) return true
         if (knownNotOutputs.contains(hash)) return false
         if (!ensureInit()) return false
@@ -176,7 +176,7 @@ object TranslationCache {
 
     fun markOutput(text: String) {
         if (text.isEmpty()) return
-        val hash = sha256(text)
+        val hash = sha256(scoped(text))
         knownNotOutputs.remove(hash)
         if (knownOutputs.size > 4000) knownOutputs.clear()
         knownOutputs.add(hash)

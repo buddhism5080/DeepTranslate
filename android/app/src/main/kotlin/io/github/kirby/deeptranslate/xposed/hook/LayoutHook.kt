@@ -36,7 +36,6 @@ object LayoutHook : BaseHook() {
     private val inflight = ConcurrentHashMap.newKeySet<String>()
 
     override fun onInit(module: XposedModule, param: PackageLoadedParam) {
-        if (!ConfigManager.isTranslationEnabled()) return
         val batcher = TranslationSession.batcher(module, param.packageName)
         val loader = param.defaultClassLoader
         hookLayoutClass(module, loader, "android.text.StaticLayout\$Builder", "obtain", adjustRange = true, batcher)

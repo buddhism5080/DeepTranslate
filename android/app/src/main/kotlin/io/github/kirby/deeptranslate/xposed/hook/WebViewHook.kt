@@ -30,7 +30,6 @@ object WebViewHook : BaseHook() {
     private val bridged = Collections.synchronizedMap(WeakHashMap<WebView, Boolean>())
 
     override fun onInit(module: XposedModule, param: PackageLoadedParam) {
-        if (!ConfigManager.isTranslationEnabled()) return
         val batcher = TranslationSession.batcher(module, param.packageName)
         val loader = param.defaultClassLoader
         val webView = load(loader, "android.webkit.WebView") ?: return
