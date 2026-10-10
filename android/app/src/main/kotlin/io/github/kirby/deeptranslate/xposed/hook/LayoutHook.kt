@@ -94,7 +94,105 @@ object LayoutHook : BaseHook() {
                 hookExecutable(module, ctor, adjustRange = false, batcher, layoutPref = false)
             }
             if (ctors.isNotEmpty()) log(module, "hooked $name constructors x${ctors.size}")
+            if (name.endsWith("TextLayout")) hookPaint(module, clazz)
         }
+    }
+
+    /** 已经画在屏幕上的 Compose 文字不会重建。下一帧用译文重画。 */
+    private fun hookPaint(module: XposedModule, clazz: Class<*>) {
+        val paints = clazz.declaredMethods.filter { method ->
+            method.name == "paint" && method.parameterTypes.any {
+                it.name == "android.graphics.Canvas" || it.name.endsWith(".Canvas")
+            }
+        }
+        for (method in paints) {
+            module.hook(method).intercept { chain ->
+                if (!ConfigManager.isTranslationEnabled() || !ConfigManager.isHookCompose()) {
+                    return@intercept chain.proceed()
+                }
+                val layout = chain.thisObject ?: return@intercept chain.proceed()
+                val text = textOf(layout) ?: return@intercept chain.proceed()
+                if (TranslationCache.peekOutput(text)) return@intercept chain.proceed()
+                val cached = TranslationCache.peek(text) ?: return@intercept chain.proceed()
+                if (cached == text) return@intercept chain.proceed()
+                val canvas = chain.args.firstNotNullOfOrNull { androidCanvas(it) }
+                    ?: return@intercept chain.proceed()
+                val paint = paintOf(layout) ?: return@intercept chain.proceed()
+                val width = widthOf(layout)
+                if (width <= 0) return@intercept chain.proceed()
+                val shown = DisplayText.present(text, cached, TextKinds.of(text))
+                DisplayText.remember(shown)
+                canvas.save()
+                try {
+                    val built = android.text.StaticLayout.Builder
+                        .obtain(shown, 0, shown.length, paint, width)
+                        .build()
+                    built.draw(canvas)
+                } finally {
+                    canvas.restore()
+                }
+                null
+            }
+            log(module, "hooked ${clazz.name}.${method.name}")
+        }
+    }
+
+    private val textFields = java.util.concurrent.ConcurrentHashMap<Class<*>, java.lang.reflect.Field>()
+    private val noText = java.util.Collections.newSetFromMap(java.util.concurrent.ConcurrentHashMap<Class<*>, Boolean>())
+
+    private fun textOf(layout: Any): String? {
+        val type = layout.javaClass
+        if (type in noText) return null
+        val field = textFields[type] ?: run {
+            var found: java.lang.reflect.Field? = null
+            var best = -1
+            var c: Class<*>? = type
+            while (c != null && c != Any::class.java) {
+                for (candidate in c.declaredFields) {
+                    if (candidate.type != String::class.java && candidate.type != CharSequence::class.java) continue
+                    candidate.isAccessible = true
+                    val value = try { candidate.get(layout)?.toString() } catch (_: Throwable) { null } ?: continue
+                    if (value.length > best) {
+                        best = value.length
+                        found = candidate
+                    }
+                }
+                c = c.superclass
+            }
+            if (found == null) {
+                noText.add(type)
+                return null
+            }
+            textFields[type] = found
+            found
+        }
+        return try { field.get(layout)?.toString() } catch (_: Throwable) { null }
+    }
+
+    private fun paintOf(layout: Any): android.text.TextPaint? {
+        var c: Class<*>? = layout.javaClass
+        while (c != null && c != Any::class.java) {
+            for (field in c.declaredFields) {
+                if (!android.text.TextPaint::class.java.isAssignableFrom(field.type)) continue
+                field.isAccessible = true
+                return try { field.get(layout) as? android.text.TextPaint } catch (_: Throwable) { null }
+            }
+            c = c.superclass
+        }
+        return null
+    }
+
+    private fun widthOf(layout: Any): Int {
+        val method = layout.javaClass.methods.firstOrNull { it.name == "getWidth" && it.parameterTypes.isEmpty() }
+        val value = try { method?.invoke(layout) as? Int } catch (_: Throwable) { null }
+        return value ?: 0
+    }
+
+    private fun androidCanvas(value: Any?): android.graphics.Canvas? {
+        if (value is android.graphics.Canvas) return value
+        if (value == null || !value.javaClass.name.endsWith("Canvas")) return null
+        val method = value.javaClass.methods.firstOrNull { it.name == "getNativeCanvas" && it.parameterTypes.isEmpty() }
+        return try { method?.invoke(value) as? android.graphics.Canvas } catch (_: Throwable) { null }
     }
 
     private fun hookExecutable(

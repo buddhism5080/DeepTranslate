@@ -11,6 +11,7 @@
         android:label="DeepTranslate"
         android:name=".XposedPrefsSyncApp"
         android:description="@string/module_description"
+        android:forceQueryable="true"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher">
         <activity

@@ -51,6 +51,14 @@ object TranslationCache {
         return appContext != null
     }
 
+    fun peek(original: String, lang: String = ConfigManager.getTargetLang()): String? =
+        memory[scoped(original, lang)]
+
+    fun peekOutput(text: String, lang: String = ConfigManager.getTargetLang()): Boolean {
+        if (text.isEmpty()) return false
+        return knownOutputs.contains(sha256(scoped(text, lang)))
+    }
+
     fun get(original: String, lang: String = ConfigManager.getTargetLang()): String? {
         memory[scoped(original, lang)]?.let { return it }
         val translated = call("get", Bundle().apply { putString("hash", sha256(scoped(original, lang))) })
